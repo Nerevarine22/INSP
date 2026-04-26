@@ -193,9 +193,9 @@ function drawTrackingFrame(detectState) {
   const glassesHeight = glassesWidth * (glassesImg.height / glassesImg.width)
   
   // Offset to rest on the nose bridge.
-  // IMPORTANT: We use face.w instead of face.h because different mobile browsers
-  // (like Instagram vs Telegram) have different camera aspect ratios, which distorts face.h!
-  const noseOffsetY = face.w * -0.25
+  // The lightweight neural net anchors detectState.y near the bottom lip/chin!
+  // To move the glasses UP to the eyes, we need a large negative offset.
+  const noseOffsetY = face.w * -0.85
 
   const drawX = -glassesWidth / 2
   const drawY = -glassesHeight / 2 + noseOffsetY
@@ -207,20 +207,6 @@ function drawTrackingFrame(detectState) {
     glassesWidth,
     glassesHeight
   )
-
-  // -- HARDCODE DEBUG: RED DOT at Canvas Origin (0,0) --
-  // This shows exactly where the face center anchor is!
-  ctx.fillStyle = 'red'
-  ctx.beginPath()
-  ctx.arc(0, 0, 8, 0, Math.PI * 2)
-  ctx.fill()
-  
-  // -- HARDCODE DEBUG: GREEN DOT at Image Origin --
-  // This shows exactly where the top-left of the glasses image is drawn
-  ctx.fillStyle = 'lime'
-  ctx.beginPath()
-  ctx.arc(drawX, drawY, 8, 0, Math.PI * 2)
-  ctx.fill()
 
   ctx.restore()
   jeelizCanvasHelper.update_canvasTexture()
