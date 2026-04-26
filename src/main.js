@@ -177,24 +177,25 @@ function drawTrackingFrame(detectState) {
   ctx.scale(1, -1)
 
   // 2. Apply Rotations (faking 3D with 2D Canvas)
-  // rz is the roll (tilt left/right). We apply this via 2D rotation.
-  ctx.rotate(detectState.rz)
+  // rz is the roll (tilt left/right). Negate it to fix inverted tilt!
+  ctx.rotate(-detectState.rz)
 
   // rx is pitch (looking up/down). ry is yaw (looking left/right).
-  // We fake perspective by scaling the X and Y axes.
-  const scaleX = Math.max(0.2, Math.cos(detectState.ry))
-  const scaleY = Math.max(0.2, Math.cos(detectState.rx))
+  // Dampen the angles so the glasses don't distort wildly when tilting the camera.
+  const pitch = detectState.rx * 0.5
+  const yaw   = detectState.ry * 0.5
+  const scaleX = Math.max(0.5, Math.cos(yaw))
+  const scaleY = Math.max(0.5, Math.cos(pitch))
   ctx.scale(scaleX, scaleY)
 
   // 3. Draw the glasses image centered
-  const glassesWidth = face.w * 1.3
+  const glassesWidth = face.w * 1.15 // Slightly scaled down for better fit
   const glassesHeight = glassesWidth * (glassesImg.height / glassesImg.width)
   
   // Offset to rest on the nose bridge.
-  // Since we unflipped the canvas, standard coordinates apply: Y points DOWN.
-  // To move the glasses UP to the eyes (which are significantly higher than the bounding box center), 
-  // we use a large negative offset.
-  const noseOffsetY = face.h * -0.45
+  // IMPORTANT: We use face.w instead of face.h because different mobile browsers
+  // (like Instagram vs Telegram) have different camera aspect ratios, which distorts face.h!
+  const noseOffsetY = face.w * -0.25
 
   ctx.drawImage(
     glassesImg,
