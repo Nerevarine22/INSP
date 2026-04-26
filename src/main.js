@@ -235,6 +235,19 @@ function drawTrackingFrame(detectState) {
   jeelizCanvasHelper.update_canvasTexture()
 }
 
+// Handle device orientation changes
+let resizeTimeout;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimeout);
+  resizeTimeout = setTimeout(() => {
+    // If the orientation changes drastically, the most robust way to reset WebAR 
+    // camera streams and neural net aspect ratios is to reload the instance.
+    if (Math.abs(window.orientation) === 90 || window.innerWidth > window.innerHeight !== (document.body.clientWidth > document.body.clientHeight)) {
+       window.location.reload();
+    }
+  }, 500);
+});
+
 function clearTrackingFrame() {
   if (!jeelizCanvasHelper) return
   const { ctx, canvas: helperCanvas } = jeelizCanvasHelper
@@ -397,11 +410,10 @@ async function startExperience() {
       throw new Error('Engine objects are missing. Script loading might have failed.')
     }
 
-    window.JeelizResizer.size_canvas({
-      canvas,
-      CSSFlipX: true,
-      isApplyCSS: true,
-      overSamplingFactor: 1,
+    JeelizResizer.size_canvas({
+      canvasId: 'jeeFaceFilterCanvas',
+      isFullScreen: true, // Let Jeeliz handle basic resizing
+      overSamplingFactor: Math.min(window.devicePixelRatio || 1, 2), // Retina support (capped at 2x to prevent thermal throttling)
       callback: async (isError, bestVideoSettings) => {
         if (isError) {
           isInitializing = false
