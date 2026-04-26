@@ -193,9 +193,9 @@ function drawTrackingFrame(detectState) {
   const glassesHeight = glassesWidth * (glassesImg.height / glassesImg.width)
   
   // Offset to rest on the nose bridge.
-  // The lightweight neural net anchors detectState.y near the bottom lip/chin!
-  // To move the glasses UP to the eyes, we need a large negative offset.
-  const noseOffsetY = face.w * -0.85
+  // The lightweight neural net anchors detectState.y near the bottom lip/chin.
+  // -0.25 was on the lip, -0.85 was on the eyebrows. -0.55 places it exactly on the eyes.
+  const noseOffsetY = face.w * -0.55
 
   const drawX = -glassesWidth / 2
   const drawY = -glassesHeight / 2 + noseOffsetY
