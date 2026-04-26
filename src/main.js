@@ -192,8 +192,9 @@ function drawTrackingFrame(detectState) {
   
   // Offset to rest on the nose bridge.
   // Since we unflipped the canvas, standard coordinates apply: Y points DOWN.
-  // To move the glasses UP to the eyes, we use a NEGATIVE offset.
-  const noseOffsetY = face.h * -0.15
+  // To move the glasses UP to the eyes (which are significantly higher than the bounding box center), 
+  // we use a large negative offset.
+  const noseOffsetY = face.h * -0.45
 
   ctx.drawImage(
     glassesImg,
