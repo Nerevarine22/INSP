@@ -264,6 +264,10 @@ select {
   z-index: 10;
 }
 
+.loading-overlay[hidden] {
+  display: none !important;
+}
+
 .loading-bar-wrap {
   width: 64%;
   max-width: 240px;
