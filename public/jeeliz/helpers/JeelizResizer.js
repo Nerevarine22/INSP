@@ -333,5 +333,6 @@ try {
   module.exports = JeelizResizer;
 } catch(e){
   console.log('JeelizResizer ES6 Module not exported');
-  window.JeelizResizer = JeelizResizer;
 }
+// Always expose globally (fixes Vite/bundler environments where module exists but window isn't set)
+window.JeelizResizer = JeelizResizer;
