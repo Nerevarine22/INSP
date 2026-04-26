@@ -4,15 +4,6 @@ const app = document.querySelector('#app')
 
 app.innerHTML = `
   <main class="mobile-shell">
-    <section class="hero-panel">
-      <p class="eyebrow">SpecSight AR</p>
-      <h1>Mobile face tracking prototype</h1>
-      <p class="intro">
-        Minimal Jeeliz demo adapted for mobile: opens the camera, detects one face,
-        and draws a live guide over it.
-      </p>
-    </section>
-
     <section class="viewer-panel">
       <div class="camera-stage">
         <canvas id="jeeFaceFilterCanvas" aria-label="Camera preview"></canvas>
@@ -29,11 +20,14 @@ app.innerHTML = `
 
         <div class="overlay bottom-overlay">
           <div class="recommendation-card" id="recommendationCard" hidden>
-            <span class="metric-label">Smart Stylist</span>
-            <strong id="faceShapeValue">Analyzing...</strong>
+            <div class="rec-header">
+              <span class="metric-label">Smart Stylist</span>
+              <strong id="faceShapeValue">Analyzing...</strong>
+            </div>
             <p id="recommendationText" class="recommendation-desc">Please look straight at the camera to determine your face shape.</p>
           </div>
-          <div class="metrics-row">
+          <!-- Debug metrics hidden for clean UI -->
+          <div class="metrics-row" style="display: none;">
             <div class="metric-card">
               <span class="metric-label">Tracking</span>
               <strong id="trackingValue">Waiting</strong>
@@ -194,8 +188,10 @@ function drawTrackingFrame(detectState) {
   const glassesWidth = face.w * 1.3
   const glassesHeight = glassesWidth * (glassesImg.height / glassesImg.width)
   
-  // Offset to rest on the nose bridge rather than the center of the bounding box
-  const noseOffsetY = face.h * -0.1
+  // Offset to rest on the nose bridge rather than the center of the bounding box.
+  // The center of Jeeliz box is roughly the tip of the nose/mouth.
+  // Moving it up by ~35% of the face height puts it exactly over the eyes.
+  const noseOffsetY = face.h * -0.35
 
   ctx.drawImage(
     glassesImg,
