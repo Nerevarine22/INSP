@@ -108,14 +108,20 @@ function hideLoading() {
 
 function injectScript(src) {
   return new Promise((resolve, reject) => {
-    // Skip if already in DOM
-    if (document.querySelector(`script[src="${src}"]`)) {
+    // Skip if already in DOM and actually loaded
+    if (document.querySelector(`script[src="${src}"][data-loaded="true"]`)) {
       return resolve()
     }
     const el = document.createElement('script')
     el.src = src
-    el.onload  = () => resolve()
-    el.onerror = () => reject(new Error(`Failed to load script: ${src}`))
+    el.onload  = () => {
+      el.dataset.loaded = 'true'
+      resolve()
+    }
+    el.onerror = () => {
+      el.remove() // remove so we can retry later
+      reject(new Error(`Failed to load script: ${src}`))
+    }
     document.head.appendChild(el)
   })
 }
@@ -289,24 +295,37 @@ async function startExperience() {
   showLoading('Starting camera…', 100)
   setStatus('Requesting camera access…', 'warning')
 
-  window.JeelizResizer.size_canvas({
-    canvas,
-    CSSFlipX: true,
-    isApplyCSS: true,
-    overSamplingFactor: 1,
-    callback: async (isError, bestVideoSettings) => {
-      if (isError) {
-        isInitializing = false
-        hideLoading()
-        setStatus('Canvas setup failed', 'error')
-        setTrackingState('Error')
-        startButton.disabled = false
-        startButton.textContent = 'Try again'
-        return
-      }
-      await initJeeliz(bestVideoSettings)
-    },
-  })
+  try {
+    if (!window.JeelizResizer || !window.JEELIZFACEFILTER) {
+      throw new Error('Engine objects are missing. Script loading might have failed.')
+    }
+
+    window.JeelizResizer.size_canvas({
+      canvas,
+      CSSFlipX: true,
+      isApplyCSS: true,
+      overSamplingFactor: 1,
+      callback: async (isError, bestVideoSettings) => {
+        if (isError) {
+          isInitializing = false
+          hideLoading()
+          setStatus('Canvas setup failed', 'error')
+          setTrackingState('Error')
+          startButton.disabled = false
+          startButton.textContent = 'Try again'
+          return
+        }
+        await initJeeliz(bestVideoSettings)
+      },
+    })
+  } catch (err) {
+    isInitializing = false
+    hideLoading()
+    setStatus(`Setup error: ${err.message}`, 'error')
+    setTrackingState('Error')
+    startButton.disabled = false
+    startButton.textContent = 'Try again'
+  }
 }
 
 startButton.addEventListener('click', startExperience)
