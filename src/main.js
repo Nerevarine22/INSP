@@ -172,26 +172,28 @@ function drawTrackingFrame(detectState) {
   // 1. Move canvas origin to the center of the detected face box
   ctx.translate(face.x + face.w / 2, face.y + face.h / 2)
 
+  // JeelizCanvas2DHelper flips the canvas vertically (scaleY = -1) by default.
+  // We MUST un-flip it so our image draws right-side up.
+  ctx.scale(1, -1)
+
   // 2. Apply Rotations (faking 3D with 2D Canvas)
   // rz is the roll (tilt left/right). We apply this via 2D rotation.
   ctx.rotate(detectState.rz)
 
   // rx is pitch (looking up/down). ry is yaw (looking left/right).
   // We fake perspective by scaling the X and Y axes.
-  // Math.cos(rx) creates a foreshortening effect when looking up or down.
   const scaleX = Math.max(0.2, Math.cos(detectState.ry))
   const scaleY = Math.max(0.2, Math.cos(detectState.rx))
   ctx.scale(scaleX, scaleY)
 
   // 3. Draw the glasses image centered
-  // The glasses are typically slightly wider than the face box.
   const glassesWidth = face.w * 1.3
   const glassesHeight = glassesWidth * (glassesImg.height / glassesImg.width)
   
   // Offset to rest on the nose bridge.
-  // The Jeeliz coordinate system inversion means positive Y goes UP relative to the face box center.
-  // Moving it by ~35% of the face height puts it exactly over the eyes.
-  const noseOffsetY = face.h * 0.35
+  // Since we unflipped the canvas, standard coordinates apply: Y points DOWN.
+  // To move the glasses UP to the eyes, we use a NEGATIVE offset.
+  const noseOffsetY = face.h * -0.15
 
   ctx.drawImage(
     glassesImg,
