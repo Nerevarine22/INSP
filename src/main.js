@@ -197,13 +197,30 @@ function drawTrackingFrame(detectState) {
   // (like Instagram vs Telegram) have different camera aspect ratios, which distorts face.h!
   const noseOffsetY = face.w * -0.25
 
+  const drawX = -glassesWidth / 2
+  const drawY = -glassesHeight / 2 + noseOffsetY
+
   ctx.drawImage(
     glassesImg,
-    -glassesWidth / 2,
-    -glassesHeight / 2 + noseOffsetY,
+    drawX,
+    drawY,
     glassesWidth,
     glassesHeight
   )
+
+  // -- HARDCODE DEBUG: RED DOT at Canvas Origin (0,0) --
+  // This shows exactly where the face center anchor is!
+  ctx.fillStyle = 'red'
+  ctx.beginPath()
+  ctx.arc(0, 0, 8, 0, Math.PI * 2)
+  ctx.fill()
+  
+  // -- HARDCODE DEBUG: GREEN DOT at Image Origin --
+  // This shows exactly where the top-left of the glasses image is drawn
+  ctx.fillStyle = 'lime'
+  ctx.beginPath()
+  ctx.arc(drawX, drawY, 8, 0, Math.PI * 2)
+  ctx.fill()
 
   ctx.restore()
   jeelizCanvasHelper.update_canvasTexture()
