@@ -177,6 +177,24 @@ function initJeeliz(bestVideoSettings) {
   })
 }
 
+function waitForJeeliz(callback, timeout = 6000) {
+  const start = Date.now()
+  function check() {
+    if (
+      window.JEELIZFACEFILTER &&
+      window.JeelizResizer &&
+      window.JeelizCanvas2DHelper
+    ) {
+      callback(null)
+    } else if (Date.now() - start > timeout) {
+      callback(new Error('timeout'))
+    } else {
+      setTimeout(check, 100)
+    }
+  }
+  check()
+}
+
 function startExperience() {
   if (isInitializing) return
 
@@ -186,37 +204,35 @@ function startExperience() {
   setStatus('Loading tracking engine...', 'warning')
   setTrackingState('Loading')
 
-  if (
-    !window.JEELIZFACEFILTER ||
-    !window.JeelizResizer ||
-    !window.JeelizCanvas2DHelper
-  ) {
-    isInitializing = false
-    setStatus('Jeeliz scripts are not available in the page', 'error')
-    setTrackingState('Error')
-    startButton.disabled = false
-    startButton.textContent = 'Try again'
-    return
-  }
+  waitForJeeliz((err) => {
+    if (err) {
+      isInitializing = false
+      setStatus('Jeeliz scripts failed to load. Check your connection.', 'error')
+      setTrackingState('Error')
+      startButton.disabled = false
+      startButton.textContent = 'Try again'
+      return
+    }
 
-  window.JeelizResizer.size_canvas({
-    canvas,
-    CSSFlipX: true,
-    isApplyCSS: true,
-    overSamplingFactor: 1,
-    callback: (isError, bestVideoSettings) => {
-      if (isError) {
-        isInitializing = false
-        setStatus('Canvas setup failed', 'error')
-        setTrackingState('Error')
-        startButton.disabled = false
-        startButton.textContent = 'Try again'
-        return
-      }
+    window.JeelizResizer.size_canvas({
+      canvas,
+      CSSFlipX: true,
+      isApplyCSS: true,
+      overSamplingFactor: 1,
+      callback: (isError, bestVideoSettings) => {
+        if (isError) {
+          isInitializing = false
+          setStatus('Canvas setup failed', 'error')
+          setTrackingState('Error')
+          startButton.disabled = false
+          startButton.textContent = 'Try again'
+          return
+        }
 
-      setStatus('Requesting camera access...', 'warning')
-      initJeeliz(bestVideoSettings)
-    },
+        setStatus('Requesting camera access...', 'warning')
+        initJeeliz(bestVideoSettings)
+      },
+    })
   })
 }
 
