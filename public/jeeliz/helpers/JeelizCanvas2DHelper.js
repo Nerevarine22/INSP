@@ -144,3 +144,5 @@ const JeelizCanvas2DHelper = function(spec){
     }
   }; //end Canvas2DDisplay return value
 } //end JeelizCanvas2DHelper()
+
+window.JeelizCanvas2DHelper = JeelizCanvas2DHelper;
