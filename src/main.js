@@ -294,7 +294,7 @@ async function startExperience() {
     CSSFlipX: true,
     isApplyCSS: true,
     overSamplingFactor: 1,
-    callback: (isError, bestVideoSettings) => {
+    callback: async (isError, bestVideoSettings) => {
       if (isError) {
         isInitializing = false
         hideLoading()
