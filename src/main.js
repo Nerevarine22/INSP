@@ -74,6 +74,7 @@ let isInitializing    = false
 let isDetected        = false
 let jeelizCanvasHelper = null
 let scriptsLoaded     = false
+let preloadPromise    = null  // resolves when scripts are ready
 
 // ─── UI helpers ────────────────────────────────────────────────────────────
 
@@ -125,6 +126,17 @@ async function loadJeelizScripts() {
     await injectScript(step.src)      // reliable onload / onerror
   }
   scriptsLoaded = true
+}
+
+// ─── Background preload (starts right after page render) ──────────────────
+
+function preloadScriptsSilently() {
+  if (preloadPromise) return preloadPromise
+  preloadPromise = loadJeelizScripts().catch(() => {
+    // silent — will retry properly on button click
+    preloadPromise = null
+  })
+  return preloadPromise
 }
 
 // ─── Tracking drawing ───────────────────────────────────────────────────────
@@ -195,11 +207,19 @@ function handleDetectionState(detectState) {
 // ─── Jeeliz init ────────────────────────────────────────────────────────────
 
 function initJeeliz(bestVideoSettings) {
+  // Merge the best settings from JeelizResizer with our max-resolution cap
+  const videoSettings = Object.assign({
+    idealWidth: 640,
+    idealHeight: 480,
+    maxWidth: 1280,
+    maxHeight: 720,
+  }, bestVideoSettings)
+
   window.JEELIZFACEFILTER.init({
     canvasId: 'jeeFaceFilterCanvas',
     NNCPath: '/jeeliz/neuralNets/',
     maxFacesDetected: 1,
-    videoSettings: bestVideoSettings,
+    videoSettings,
     callbackReady: (errCode, spec) => {
       isInitializing = false
       hideLoading()
@@ -272,3 +292,7 @@ async function startExperience() {
 }
 
 startButton.addEventListener('click', startExperience)
+
+// Start preloading Jeeliz scripts immediately after UI renders
+// (100ms delay lets the browser paint the UI first)
+setTimeout(preloadScriptsSilently, 100)
