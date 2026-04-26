@@ -188,10 +188,10 @@ function drawTrackingFrame(detectState) {
   const glassesWidth = face.w * 1.3
   const glassesHeight = glassesWidth * (glassesImg.height / glassesImg.width)
   
-  // Offset to rest on the nose bridge rather than the center of the bounding box.
-  // The center of Jeeliz box is roughly the tip of the nose/mouth.
-  // Moving it up by ~35% of the face height puts it exactly over the eyes.
-  const noseOffsetY = face.h * -0.35
+  // Offset to rest on the nose bridge.
+  // The Jeeliz coordinate system inversion means positive Y goes UP relative to the face box center.
+  // Moving it by ~35% of the face height puts it exactly over the eyes.
+  const noseOffsetY = face.h * 0.35
 
   ctx.drawImage(
     glassesImg,
