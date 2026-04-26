@@ -126,9 +126,9 @@ function injectScript(src) {
   })
 }
 
-async function loadJeelizScripts() {
+async function loadJeelizScripts(silent = false) {
   for (const step of JEELIZ_SCRIPTS) {
-    showLoading(step.label, step.progress)
+    if (!silent) showLoading(step.label, step.progress)
     await injectScript(step.src)      // reliable onload / onerror
   }
   scriptsLoaded = true
@@ -138,7 +138,7 @@ async function loadJeelizScripts() {
 
 function preloadScriptsSilently() {
   if (preloadPromise) return preloadPromise
-  preloadPromise = loadJeelizScripts().catch(() => {
+  preloadPromise = loadJeelizScripts(true).catch(() => {
     // silent — will retry properly on button click
     preloadPromise = null
   })
