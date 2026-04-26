@@ -192,8 +192,14 @@ function drawTrackingFrame(detectState) {
   ctx.clearRect(0, 0, helperCanvas.width, helperCanvas.height)
   ctx.save()
 
-  // 1. Move canvas origin to the center of the detected face box
-  ctx.translate(face.x + face.w / 2, face.y + face.h / 2)
+  // When the head turns left/right (yaw), the nose moves away from the center of the 2D bounding box.
+  // Math.sin(yaw) gives us the relative shift on a 3D sphere.
+  // 0.35 is a magic multiplier that approximates the distance from the center of the head to the nose.
+  // If the glasses slide the WRONG way when turning, change this to -0.35.
+  const noseOffsetX = face.w * Math.sin(smoothedRot.ry) * -0.35
+
+  // 1. Move canvas origin to the center of the detected face box, adjusted for 3D yaw.
+  ctx.translate(face.x + face.w / 2 + noseOffsetX, face.y + face.h / 2)
 
   // JeelizCanvas2DHelper flips the canvas vertically (scaleY = -1) by default.
   // We MUST un-flip it so our image draws right-side up.
