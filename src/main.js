@@ -34,7 +34,7 @@ app.innerHTML = `
           </div>
           <div class="metric-card">
             <span class="metric-label">Rotation</span>
-            <strong id="rotationValue">0°, 0°, 0°</strong>
+            <strong id="rotationValue">0 deg, 0 deg, 0 deg</strong>
           </div>
         </div>
       </div>
@@ -54,7 +54,6 @@ const SETTINGS = {
   detectionHysteresis: 0.04,
 }
 
-let isScriptsLoaded = false
 let isInitializing = false
 let isDetected = false
 let jeelizCanvasHelper = null
@@ -70,44 +69,8 @@ function setTrackingState(label) {
 }
 
 function setRotation(rx = 0, ry = 0, rz = 0) {
-  const toDegrees = (value) => `${Math.round((value * 180) / Math.PI)}°`
+  const toDegrees = (value) => `${Math.round((value * 180) / Math.PI)} deg`
   rotationValue.textContent = `${toDegrees(rx)}, ${toDegrees(ry)}, ${toDegrees(rz)}`
-}
-
-function loadScript(src) {
-  return new Promise((resolve, reject) => {
-    const existing = document.querySelector(`script[src="${src}"]`)
-    if (existing) {
-      if (existing.dataset.loaded === 'true') {
-        resolve()
-      } else {
-        existing.addEventListener('load', resolve, { once: true })
-        existing.addEventListener('error', reject, { once: true })
-      }
-      return
-    }
-
-    const script = document.createElement('script')
-    script.src = src
-    script.async = false
-    script.addEventListener('load', () => {
-      script.dataset.loaded = 'true'
-      resolve()
-    }, { once: true })
-    script.addEventListener('error', () => {
-      reject(new Error(`Failed to load script: ${src}`))
-    }, { once: true })
-    document.head.append(script)
-  })
-}
-
-async function ensureJeelizScripts() {
-  if (isScriptsLoaded) return
-
-  await loadScript('/jeeliz/dist/jeelizFaceFilter.js')
-  await loadScript('/jeeliz/helpers/JeelizResizer.js')
-  await loadScript('/jeeliz/helpers/JeelizCanvas2DHelper.js')
-  isScriptsLoaded = true
 }
 
 function drawTrackingFrame(detectState) {
@@ -214,7 +177,7 @@ function initJeeliz(bestVideoSettings) {
   })
 }
 
-async function startExperience() {
+function startExperience() {
   if (isInitializing) return
 
   isInitializing = true
@@ -223,36 +186,38 @@ async function startExperience() {
   setStatus('Loading tracking engine...', 'warning')
   setTrackingState('Loading')
 
-  try {
-    await ensureJeelizScripts()
-
-    window.JeelizResizer.size_canvas({
-      canvas,
-      CSSFlipX: true,
-      isApplyCSS: true,
-      overSamplingFactor: 1,
-      callback: (isError, bestVideoSettings) => {
-        if (isError) {
-          isInitializing = false
-          setStatus('Canvas setup failed', 'error')
-          setTrackingState('Error')
-          startButton.disabled = false
-          startButton.textContent = 'Try again'
-          return
-        }
-
-        setStatus('Requesting camera access...', 'warning')
-        initJeeliz(bestVideoSettings)
-      },
-    })
-  } catch (error) {
+  if (
+    !window.JEELIZFACEFILTER ||
+    !window.JeelizResizer ||
+    !window.JeelizCanvas2DHelper
+  ) {
     isInitializing = false
-    setStatus('Failed to load Jeeliz assets', 'error')
+    setStatus('Jeeliz scripts are not available in the page', 'error')
     setTrackingState('Error')
     startButton.disabled = false
     startButton.textContent = 'Try again'
-    console.error(error)
+    return
   }
+
+  window.JeelizResizer.size_canvas({
+    canvas,
+    CSSFlipX: true,
+    isApplyCSS: true,
+    overSamplingFactor: 1,
+    callback: (isError, bestVideoSettings) => {
+      if (isError) {
+        isInitializing = false
+        setStatus('Canvas setup failed', 'error')
+        setTrackingState('Error')
+        startButton.disabled = false
+        startButton.textContent = 'Try again'
+        return
+      }
+
+      setStatus('Requesting camera access...', 'warning')
+      initJeeliz(bestVideoSettings)
+    },
+  })
 }
 
 startButton.addEventListener('click', startExperience)
