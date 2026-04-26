@@ -247,3 +247,43 @@ select {
     margin: 0 auto;
   }
 }
+
+/* ─── Loading overlay ──────────────────────────────────── */
+
+.loading-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  background: rgba(9, 8, 7, 0.72);
+  backdrop-filter: blur(10px);
+  border-radius: 20px;
+  z-index: 10;
+}
+
+.loading-bar-wrap {
+  width: 64%;
+  max-width: 240px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.loading-bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #f5d368, #f0bb54);
+  border-radius: 999px;
+  transition: width 0.35s ease;
+}
+
+.loading-label {
+  margin: 0;
+  font-size: 0.88rem;
+  color: rgba(246, 241, 232, 0.72);
+  letter-spacing: 0.04em;
+}

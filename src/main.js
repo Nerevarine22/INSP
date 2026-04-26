@@ -37,26 +37,45 @@ app.innerHTML = `
             <strong id="rotationValue">0 deg, 0 deg, 0 deg</strong>
           </div>
         </div>
+
+        <div id="loadingOverlay" class="loading-overlay" hidden>
+          <div class="loading-bar-wrap">
+            <div class="loading-bar" id="loadingBar"></div>
+          </div>
+          <p id="loadingLabel" class="loading-label">Loading…</p>
+        </div>
       </div>
     </section>
   </main>
 `
 
-const startButton = document.querySelector('#startButton')
-const statusText = document.querySelector('#statusText')
-const trackingValue = document.querySelector('#trackingValue')
-const rotationValue = document.querySelector('#rotationValue')
-const statusDot = document.querySelector('#statusDot')
-const canvas = document.querySelector('#jeeFaceFilterCanvas')
+const startButton     = document.querySelector('#startButton')
+const statusText      = document.querySelector('#statusText')
+const trackingValue   = document.querySelector('#trackingValue')
+const rotationValue   = document.querySelector('#rotationValue')
+const statusDot       = document.querySelector('#statusDot')
+const canvas          = document.querySelector('#jeeFaceFilterCanvas')
+const loadingOverlay  = document.querySelector('#loadingOverlay')
+const loadingBar      = document.querySelector('#loadingBar')
+const loadingLabel    = document.querySelector('#loadingLabel')
 
 const SETTINGS = {
   detectionThreshold: 0.82,
   detectionHysteresis: 0.04,
 }
 
-let isInitializing = false
-let isDetected = false
+const JEELIZ_SCRIPTS = [
+  { src: '/jeeliz/dist/jeelizFaceFilter.js',      label: 'Loading face engine…',  progress: 33 },
+  { src: '/jeeliz/helpers/JeelizResizer.js',       label: 'Loading canvas helper…', progress: 66 },
+  { src: '/jeeliz/helpers/JeelizCanvas2DHelper.js',label: 'Ready…',                progress: 100 },
+]
+
+let isInitializing    = false
+let isDetected        = false
 let jeelizCanvasHelper = null
+let scriptsLoaded     = false
+
+// ─── UI helpers ────────────────────────────────────────────────────────────
 
 function setStatus(message, tone = 'idle') {
   statusText.textContent = message
@@ -69,21 +88,57 @@ function setTrackingState(label) {
 }
 
 function setRotation(rx = 0, ry = 0, rz = 0) {
-  const toDegrees = (value) => `${Math.round((value * 180) / Math.PI)} deg`
+  const toDegrees = (v) => `${Math.round((v * 180) / Math.PI)} deg`
   rotationValue.textContent = `${toDegrees(rx)}, ${toDegrees(ry)}, ${toDegrees(rz)}`
 }
 
+function showLoading(label, pct) {
+  loadingOverlay.hidden = false
+  loadingLabel.textContent = label
+  loadingBar.style.width = `${pct}%`
+}
+
+function hideLoading() {
+  loadingOverlay.hidden = true
+  loadingBar.style.width = '0%'
+}
+
+// ─── Dynamic script loader ──────────────────────────────────────────────────
+
+function injectScript(src) {
+  return new Promise((resolve, reject) => {
+    // Skip if already in DOM
+    if (document.querySelector(`script[src="${src}"]`)) {
+      return resolve()
+    }
+    const el = document.createElement('script')
+    el.src = src
+    el.onload  = () => resolve()
+    el.onerror = () => reject(new Error(`Failed to load script: ${src}`))
+    document.head.appendChild(el)
+  })
+}
+
+async function loadJeelizScripts() {
+  for (const step of JEELIZ_SCRIPTS) {
+    showLoading(step.label, step.progress)
+    await injectScript(step.src)      // reliable onload / onerror
+  }
+  scriptsLoaded = true
+}
+
+// ─── Tracking drawing ───────────────────────────────────────────────────────
+
 function drawTrackingFrame(detectState) {
   if (!jeelizCanvasHelper) return
-
   const { ctx, canvas: helperCanvas } = jeelizCanvasHelper
-  const face = jeelizCanvasHelper.getCoordinates(detectState)
+  const face   = jeelizCanvasHelper.getCoordinates(detectState)
   const radius = Math.max(18, face.w * 0.12)
 
   ctx.clearRect(0, 0, helperCanvas.width, helperCanvas.height)
   ctx.strokeStyle = 'rgba(245, 211, 104, 0.95)'
-  ctx.lineWidth = Math.max(2, face.w * 0.015)
-  ctx.fillStyle = 'rgba(245, 211, 104, 0.08)'
+  ctx.lineWidth   = Math.max(2, face.w * 0.015)
+  ctx.fillStyle   = 'rgba(245, 211, 104, 0.08)'
 
   ctx.beginPath()
   ctx.moveTo(face.x + radius, face.y)
@@ -109,12 +164,7 @@ function drawTrackingFrame(detectState) {
 
 function clearTrackingFrame() {
   if (!jeelizCanvasHelper) return
-  jeelizCanvasHelper.ctx.clearRect(
-    0,
-    0,
-    jeelizCanvasHelper.canvas.width,
-    jeelizCanvasHelper.canvas.height
-  )
+  jeelizCanvasHelper.ctx.clearRect(0, 0, jeelizCanvasHelper.canvas.width, jeelizCanvasHelper.canvas.height)
   jeelizCanvasHelper.update_canvasTexture()
 }
 
@@ -127,23 +177,22 @@ function handleDetectionState(detectState) {
     setRotation()
     return
   }
-
   if (!isDetected && detectState.detected > SETTINGS.detectionThreshold + SETTINGS.detectionHysteresis) {
     isDetected = true
     setStatus('Face detected', 'success')
   }
-
   if (!isDetected) {
     setTrackingState('Searching')
     clearTrackingFrame()
     setRotation()
     return
   }
-
   setTrackingState(`${Math.round(detectState.detected * 100)}%`)
   setRotation(detectState.rx, detectState.ry, detectState.rz)
   drawTrackingFrame(detectState)
 }
+
+// ─── Jeeliz init ────────────────────────────────────────────────────────────
 
 function initJeeliz(bestVideoSettings) {
   window.JEELIZFACEFILTER.init({
@@ -153,6 +202,7 @@ function initJeeliz(bestVideoSettings) {
     videoSettings: bestVideoSettings,
     callbackReady: (errCode, spec) => {
       isInitializing = false
+      hideLoading()
 
       if (errCode) {
         setStatus(`Camera start failed: ${errCode}`, 'error')
@@ -170,69 +220,54 @@ function initJeeliz(bestVideoSettings) {
     },
     callbackTrack: (detectState) => {
       handleDetectionState(detectState)
-      if (jeelizCanvasHelper) {
-        jeelizCanvasHelper.draw()
-      }
+      if (jeelizCanvasHelper) jeelizCanvasHelper.draw()
     },
   })
 }
 
-function waitForJeeliz(callback, timeout = 6000) {
-  const start = Date.now()
-  function check() {
-    if (
-      window.JEELIZFACEFILTER &&
-      window.JeelizResizer &&
-      window.JeelizCanvas2DHelper
-    ) {
-      callback(null)
-    } else if (Date.now() - start > timeout) {
-      callback(new Error('timeout'))
-    } else {
-      setTimeout(check, 100)
-    }
-  }
-  check()
-}
+// ─── Main entry ─────────────────────────────────────────────────────────────
 
-function startExperience() {
+async function startExperience() {
   if (isInitializing) return
-
   isInitializing = true
   startButton.disabled = true
-  startButton.textContent = 'Starting...'
-  setStatus('Loading tracking engine...', 'warning')
+  setStatus('Loading tracking engine…', 'warning')
   setTrackingState('Loading')
 
-  waitForJeeliz((err) => {
-    if (err) {
-      isInitializing = false
-      setStatus('Jeeliz scripts failed to load. Check your connection.', 'error')
-      setTrackingState('Error')
-      startButton.disabled = false
-      startButton.textContent = 'Try again'
-      return
+  try {
+    if (!scriptsLoaded) {
+      await loadJeelizScripts()
     }
+  } catch (err) {
+    isInitializing = false
+    hideLoading()
+    setStatus(`Failed to load engine: ${err.message}`, 'error')
+    setTrackingState('Error')
+    startButton.disabled = false
+    startButton.textContent = 'Try again'
+    return
+  }
 
-    window.JeelizResizer.size_canvas({
-      canvas,
-      CSSFlipX: true,
-      isApplyCSS: true,
-      overSamplingFactor: 1,
-      callback: (isError, bestVideoSettings) => {
-        if (isError) {
-          isInitializing = false
-          setStatus('Canvas setup failed', 'error')
-          setTrackingState('Error')
-          startButton.disabled = false
-          startButton.textContent = 'Try again'
-          return
-        }
+  showLoading('Starting camera…', 100)
+  setStatus('Requesting camera access…', 'warning')
 
-        setStatus('Requesting camera access...', 'warning')
-        initJeeliz(bestVideoSettings)
-      },
-    })
+  window.JeelizResizer.size_canvas({
+    canvas,
+    CSSFlipX: true,
+    isApplyCSS: true,
+    overSamplingFactor: 1,
+    callback: (isError, bestVideoSettings) => {
+      if (isError) {
+        isInitializing = false
+        hideLoading()
+        setStatus('Canvas setup failed', 'error')
+        setTrackingState('Error')
+        startButton.disabled = false
+        startButton.textContent = 'Try again'
+        return
+      }
+      initJeeliz(bestVideoSettings)
+    },
   })
 }
 
