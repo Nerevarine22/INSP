@@ -28,13 +28,20 @@ app.innerHTML = `
         </div>
 
         <div class="overlay bottom-overlay">
-          <div class="metric-card">
-            <span class="metric-label">Tracking</span>
-            <strong id="trackingValue">Waiting</strong>
+          <div class="recommendation-card" id="recommendationCard" hidden>
+            <span class="metric-label">Smart Stylist</span>
+            <strong id="faceShapeValue">Analyzing...</strong>
+            <p id="recommendationText" class="recommendation-desc">Please look straight at the camera to determine your face shape.</p>
           </div>
-          <div class="metric-card">
-            <span class="metric-label">Rotation</span>
-            <strong id="rotationValue">0 deg, 0 deg, 0 deg</strong>
+          <div class="metrics-row">
+            <div class="metric-card">
+              <span class="metric-label">Tracking</span>
+              <strong id="trackingValue">Waiting</strong>
+            </div>
+            <div class="metric-card">
+              <span class="metric-label">Rotation</span>
+              <strong id="rotationValue">0 deg, 0 deg, 0 deg</strong>
+            </div>
           </div>
         </div>
 
@@ -59,6 +66,10 @@ const loadingOverlay  = document.querySelector('#loadingOverlay')
 const loadingBar      = document.querySelector('#loadingBar')
 const loadingLabel    = document.querySelector('#loadingLabel')
 
+const recommendationCard = document.querySelector('#recommendationCard')
+const faceShapeValue     = document.querySelector('#faceShapeValue')
+const recommendationText = document.querySelector('#recommendationText')
+
 const SETTINGS = {
   detectionThreshold: 0.82,
   detectionHysteresis: 0.04,
@@ -75,6 +86,15 @@ let isDetected        = false
 let jeelizCanvasHelper = null
 let scriptsLoaded     = false
 let preloadPromise    = null  // resolves when scripts are ready
+
+// Face Analytics State
+let faceRatioSamples  = []
+let analysisComplete  = false
+
+// ─── Assets ─────────────────────────────────────────────────────────────────
+
+const glassesImg = new Image()
+glassesImg.src = '/glasses.svg'
 
 // ─── UI helpers ────────────────────────────────────────────────────────────
 
@@ -148,35 +168,44 @@ function preloadScriptsSilently() {
 // ─── Tracking drawing ───────────────────────────────────────────────────────
 
 function drawTrackingFrame(detectState) {
-  if (!jeelizCanvasHelper) return
+  if (!jeelizCanvasHelper || !glassesImg.complete) return
   const { ctx, canvas: helperCanvas } = jeelizCanvasHelper
-  const face   = jeelizCanvasHelper.getCoordinates(detectState)
-  const radius = Math.max(18, face.w * 0.12)
+  const face = jeelizCanvasHelper.getCoordinates(detectState)
 
   ctx.clearRect(0, 0, helperCanvas.width, helperCanvas.height)
-  ctx.strokeStyle = 'rgba(245, 211, 104, 0.95)'
-  ctx.lineWidth   = Math.max(2, face.w * 0.015)
-  ctx.fillStyle   = 'rgba(245, 211, 104, 0.08)'
+  ctx.save()
 
-  ctx.beginPath()
-  ctx.moveTo(face.x + radius, face.y)
-  ctx.lineTo(face.x + face.w - radius, face.y)
-  ctx.quadraticCurveTo(face.x + face.w, face.y, face.x + face.w, face.y + radius)
-  ctx.lineTo(face.x + face.w, face.y + face.h - radius)
-  ctx.quadraticCurveTo(face.x + face.w, face.y + face.h, face.x + face.w - radius, face.y + face.h)
-  ctx.lineTo(face.x + radius, face.y + face.h)
-  ctx.quadraticCurveTo(face.x, face.y + face.h, face.x, face.y + face.h - radius)
-  ctx.lineTo(face.x, face.y + radius)
-  ctx.quadraticCurveTo(face.x, face.y, face.x + radius, face.y)
-  ctx.closePath()
-  ctx.fill()
-  ctx.stroke()
+  // 1. Move canvas origin to the center of the detected face box
+  ctx.translate(face.x + face.w / 2, face.y + face.h / 2)
 
-  ctx.beginPath()
-  ctx.arc(face.x + face.w * 0.5, face.y + face.h * 0.42, Math.max(6, face.w * 0.03), 0, Math.PI * 2)
-  ctx.fillStyle = 'rgba(255,255,255,0.85)'
-  ctx.fill()
+  // 2. Apply Rotations (faking 3D with 2D Canvas)
+  // rz is the roll (tilt left/right). We apply this via 2D rotation.
+  ctx.rotate(detectState.rz)
 
+  // rx is pitch (looking up/down). ry is yaw (looking left/right).
+  // We fake perspective by scaling the X and Y axes.
+  // Math.cos(rx) creates a foreshortening effect when looking up or down.
+  const scaleX = Math.max(0.2, Math.cos(detectState.ry))
+  const scaleY = Math.max(0.2, Math.cos(detectState.rx))
+  ctx.scale(scaleX, scaleY)
+
+  // 3. Draw the glasses image centered
+  // The glasses are typically slightly wider than the face box.
+  const glassesWidth = face.w * 1.3
+  const glassesHeight = glassesWidth * (glassesImg.height / glassesImg.width)
+  
+  // Offset to rest on the nose bridge rather than the center of the bounding box
+  const noseOffsetY = face.h * -0.1
+
+  ctx.drawImage(
+    glassesImg,
+    -glassesWidth / 2,
+    -glassesHeight / 2 + noseOffsetY,
+    glassesWidth,
+    glassesHeight
+  )
+
+  ctx.restore()
   jeelizCanvasHelper.update_canvasTexture()
 }
 
@@ -193,11 +222,13 @@ function handleDetectionState(detectState) {
     setTrackingState('Searching')
     clearTrackingFrame()
     setRotation()
+    recommendationCard.hidden = true
     return
   }
   if (!isDetected && detectState.detected > SETTINGS.detectionThreshold + SETTINGS.detectionHysteresis) {
     isDetected = true
     setStatus('Face detected', 'success')
+    recommendationCard.hidden = false
   }
   if (!isDetected) {
     setTrackingState('Searching')
@@ -208,6 +239,43 @@ function handleDetectionState(detectState) {
   setTrackingState(`${Math.round(detectState.detected * 100)}%`)
   setRotation(detectState.rx, detectState.ry, detectState.rz)
   drawTrackingFrame(detectState)
+  
+  if (!analysisComplete) {
+    analyzeFaceShape(detectState)
+  }
+}
+
+function analyzeFaceShape(detectState) {
+  // Only sample if the user is looking relatively straight (rx and ry close to 0)
+  const isLookingStraight = Math.abs(detectState.rx) < 0.15 && Math.abs(detectState.ry) < 0.15
+  
+  if (!isLookingStraight) {
+    return // skip frame
+  }
+
+  const face = jeelizCanvasHelper.getCoordinates(detectState)
+  const ratio = face.w / face.h
+  faceRatioSamples.push(ratio)
+
+  if (faceRatioSamples.length >= 30) {
+    analysisComplete = true
+    const avgRatio = faceRatioSamples.reduce((a, b) => a + b, 0) / faceRatioSamples.length
+    
+    // Ratios are typically between 0.7 and 1.0 depending on the model output and face shape.
+    // Taller/narrower ratio indicates an Oval/Long face, wider ratio indicates Round/Square.
+    if (avgRatio > 0.82) {
+      faceShapeValue.textContent = 'Round / Square'
+      recommendationText.textContent = 'Angular frames like rectangles or wayfarers will add great contrast to your face.'
+    } else {
+      faceShapeValue.textContent = 'Oval / Long'
+      recommendationText.textContent = 'Most frames suit you! Try oversized or round frames to complement your proportions.'
+    }
+    
+    // Celebrate with UI update
+    recommendationCard.style.boxShadow = '0 0 0 2px var(--success), 0 14px 30px rgba(125, 227, 161, 0.15)'
+  } else {
+    faceShapeValue.textContent = `Analyzing... ${Math.round((faceRatioSamples.length / 30) * 100)}%`
+  }
 }
 
 // ─── Jeeliz init ────────────────────────────────────────────────────────────
