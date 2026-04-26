@@ -206,7 +206,7 @@ function handleDetectionState(detectState) {
 
 // ─── Jeeliz init ────────────────────────────────────────────────────────────
 
-function initJeeliz(bestVideoSettings) {
+async function initJeeliz(bestVideoSettings) {
   // Merge the best settings from JeelizResizer with our max-resolution cap
   const videoSettings = Object.assign({
     idealWidth: 640,
@@ -215,9 +215,27 @@ function initJeeliz(bestVideoSettings) {
     maxHeight: 720,
   }, bestVideoSettings)
 
+  // Fetch the lightweight model (~250KB vs 3.7MB default)
+  // Jeeliz accepts a pre-fetched NNC object directly
+  const nnUrl = '/jeeliz/neuralNets/NN_VERYLIGHT_1.json'
+  let nnData
+  try {
+    const res = await fetch(nnUrl)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    nnData = await res.json()
+  } catch (e) {
+    isInitializing = false
+    hideLoading()
+    setStatus(`Failed to load neural net: ${e.message}`, 'error')
+    setTrackingState('Error')
+    startButton.disabled = false
+    startButton.textContent = 'Try again'
+    return
+  }
+
   window.JEELIZFACEFILTER.init({
     canvasId: 'jeeFaceFilterCanvas',
-    NNCPath: '/jeeliz/neuralNets/',
+    NNC: nnData,          // pre-fetched lightweight model
     maxFacesDetected: 1,
     videoSettings,
     callbackReady: (errCode, spec) => {
@@ -286,13 +304,17 @@ async function startExperience() {
         startButton.textContent = 'Try again'
         return
       }
-      initJeeliz(bestVideoSettings)
+      await initJeeliz(bestVideoSettings)
     },
   })
 }
 
 startButton.addEventListener('click', startExperience)
 
-// Start preloading Jeeliz scripts immediately after UI renders
-// (100ms delay lets the browser paint the UI first)
+// ─── Background preload (starts right after UI render) ─────────────────────
+// 1. Jeeliz JS scripts
 setTimeout(preloadScriptsSilently, 100)
+// 2. Neural network JSON — prefetch into browser cache so fetch() is instant
+setTimeout(() => {
+  fetch('/jeeliz/neuralNets/NN_VERYLIGHT_1.json').catch(() => {})
+}, 200)
