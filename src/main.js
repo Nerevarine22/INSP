@@ -85,6 +85,11 @@ let preloadPromise    = null  // resolves when scripts are ready
 let faceRatioSamples  = []
 let analysisComplete  = false
 
+// Tracking Smoothing (LERP) State
+let smoothedFace      = null
+let smoothedRot       = null
+const LERP_FACTOR     = 0.35 // 35% new position, 65% old position for smooth tracking
+
 // ─── Assets ─────────────────────────────────────────────────────────────────
 
 const glassesImg = new Image()
@@ -164,7 +169,25 @@ function preloadScriptsSilently() {
 function drawTrackingFrame(detectState) {
   if (!jeelizCanvasHelper || !glassesImg.complete) return
   const { ctx, canvas: helperCanvas } = jeelizCanvasHelper
-  const face = jeelizCanvasHelper.getCoordinates(detectState)
+  const rawFace = jeelizCanvasHelper.getCoordinates(detectState)
+
+  // Initialize smoothing if it's the first frame
+  if (!smoothedFace) {
+    smoothedFace = { ...rawFace }
+    smoothedRot  = { rx: detectState.rx, ry: detectState.ry, rz: detectState.rz }
+  } else {
+    // Apply Linear Interpolation (LERP) to reduce jitter
+    smoothedFace.x += (rawFace.x - smoothedFace.x) * LERP_FACTOR
+    smoothedFace.y += (rawFace.y - smoothedFace.y) * LERP_FACTOR
+    smoothedFace.w += (rawFace.w - smoothedFace.w) * LERP_FACTOR
+    smoothedFace.h += (rawFace.h - smoothedFace.h) * LERP_FACTOR
+
+    smoothedRot.rx += (detectState.rx - smoothedRot.rx) * LERP_FACTOR
+    smoothedRot.ry += (detectState.ry - smoothedRot.ry) * LERP_FACTOR
+    smoothedRot.rz += (detectState.rz - smoothedRot.rz) * LERP_FACTOR
+  }
+
+  const face = smoothedFace
 
   ctx.clearRect(0, 0, helperCanvas.width, helperCanvas.height)
   ctx.save()
@@ -178,12 +201,12 @@ function drawTrackingFrame(detectState) {
 
   // 2. Apply Rotations (faking 3D with 2D Canvas)
   // rz is the roll (tilt left/right). Negate it to fix inverted tilt!
-  ctx.rotate(-detectState.rz)
+  ctx.rotate(-smoothedRot.rz)
 
   // rx is pitch (looking up/down). ry is yaw (looking left/right).
   // Dampen the angles so the glasses don't distort wildly when tilting the camera.
-  const pitch = detectState.rx * 0.5
-  const yaw   = detectState.ry * 0.5
+  const pitch = smoothedRot.rx * 0.5
+  const yaw   = smoothedRot.ry * 0.5
   const scaleX = Math.max(0.5, Math.cos(yaw))
   const scaleY = Math.max(0.5, Math.cos(pitch))
   ctx.scale(scaleX, scaleY)
@@ -214,8 +237,11 @@ function drawTrackingFrame(detectState) {
 
 function clearTrackingFrame() {
   if (!jeelizCanvasHelper) return
-  jeelizCanvasHelper.ctx.clearRect(0, 0, jeelizCanvasHelper.canvas.width, jeelizCanvasHelper.canvas.height)
+  const { ctx, canvas: helperCanvas } = jeelizCanvasHelper
+  ctx.clearRect(0, 0, helperCanvas.width, helperCanvas.height)
   jeelizCanvasHelper.update_canvasTexture()
+  smoothedFace = null
+  smoothedRot  = null
 }
 
 function handleDetectionState(detectState) {
