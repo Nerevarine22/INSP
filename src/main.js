@@ -37,6 +37,7 @@ app.innerHTML = `
               <strong id="rotationValue">0 deg, 0 deg, 0 deg</strong>
             </div>
           </div>
+          <p class="drag-hint" id="dragHint" hidden>↕ Drag to adjust</p>
         </div>
 
         <div id="loadingOverlay" class="loading-overlay" hidden>
@@ -59,6 +60,7 @@ const canvas          = document.querySelector('#jeeFaceFilterCanvas')
 const loadingOverlay  = document.querySelector('#loadingOverlay')
 const loadingBar      = document.querySelector('#loadingBar')
 const loadingLabel    = document.querySelector('#loadingLabel')
+const dragHint        = document.querySelector('#dragHint')
 
 const recommendationCard = document.querySelector('#recommendationCard')
 const faceShapeValue     = document.querySelector('#faceShapeValue')
@@ -90,18 +92,14 @@ let smoothedFace      = null
 let smoothedRot       = null
 const LERP_FACTOR     = 0.35 // 35% new position, 65% old position for smooth tracking
 
-// ─── Adaptive Eye-Level Calibration ──────────────────────────────────────────
-// NN_DEFAULT anchors the bounding box near the nose bridge (better than VERYLIGHT).
-// But every face still has slightly different eye-to-nose-bridge ratio.
-// We auto-calibrate: while the user looks straight (|rx|<0.12, |ry|<0.12)
-// we sample face.y relative to canvas height and store the mean offset.
-// After CALIB_FRAMES samples the offset is locked for the session.
-const CALIB_FRAMES    = 40          // frames to collect before locking
-const EYE_RATIO_DEFAULT = -0.50     // NN_DEFAULT: eyes sit ~50% above the Jeeliz center
-let   eyeOffsetRatio  = EYE_RATIO_DEFAULT
-let   calibSamples    = []          // raw face.w fractions collected during calibration
-let   calibLocked     = false
-let   calibProgress   = 0           // 0-100 for UI feedback
+// ─── Eye-Level Offset ────────────────────────────────────────────────────────
+// eyeOffsetY is applied in ctx.translate() BEFORE ctx.scale(1,-1).
+// Because of that flip, POSITIVE values move the glasses UP on screen.
+// NN_DEFAULT anchors near the nose bridge; +0.70 brings us to eye level.
+// The user can drag the camera stage to fine-tune this offset at runtime.
+const EYE_RATIO_BASE  = 0.70        // fraction of face.w to shift upward
+let   userYOffset     = 0           // extra pixels from drag gesture (screen coords)
+let   dragStartY      = null        // touchstart / mousedown Y
 
 // ─── Assets ─────────────────────────────────────────────────────────────────
 
@@ -209,12 +207,12 @@ function drawTrackingFrame(detectState) {
   // Math.sin(yaw) * -0.35 approximates that shift on a 3D sphere.
   const noseOffsetX = face.w * Math.sin(smoothedRot.ry) * -0.35
 
-  // Vertical eye-level correction using the adaptively calibrated ratio.
-  // eyeOffsetRatio is negative → shift upward from the Jeeliz anchor point.
-  const eyeOffsetY  = face.w * eyeOffsetRatio
+  // Vertical correction: positive = UP (applied before scale(1,-1) which flips Y).
+  // userYOffset is in screen pixels from drag (negative = user dragged DOWN → lower glasses).
+  const eyeOffsetY  = face.w * EYE_RATIO_BASE + userYOffset
 
-  // 1. Move canvas origin to the calibrated eye-level center.
-  ctx.translate(face.x + face.w / 2 + noseOffsetX, face.y + face.h / 2 + eyeOffsetY)
+  // 1. Move canvas origin to the eye-level anchor.
+  ctx.translate(face.x + face.w / 2 + noseOffsetX, face.y + face.h / 2 - eyeOffsetY)
 
   // JeelizCanvas2DHelper flips the canvas vertically (scaleY = -1) by default.
   // We MUST un-flip it so our image draws right-side up.
@@ -304,52 +302,17 @@ function handleDetectionState(detectState) {
 }
 
 function analyzeFaceShape(detectState) {
-  // Only sample if the user is looking relatively straight (rx and ry close to 0)
-  const isLookingStraight = Math.abs(detectState.rx) < 0.12 && Math.abs(detectState.ry) < 0.12
-
-  if (!isLookingStraight) return
+  if (analysisComplete) return
+  // Only sample while looking straight ahead
+  if (Math.abs(detectState.rx) > 0.12 || Math.abs(detectState.ry) > 0.12) return
 
   const face = jeelizCanvasHelper.getCoordinates(detectState)
-
-  // ── Adaptive Eye-Level Calibration ───────────────────────────────────────
-  // While we are collecting straight-ahead frames anyway, also calibrate
-  // the vertical offset so glasses sit at the correct eye level universally.
-  // NN_DEFAULT anchor ≈ nose bridge.  Empirically eyes are ~0.15–0.22 × face.w
-  // above the anchor.  We refine this by measuring face.y/canvas height ratios
-  // across multiple frames and converging to the median.
-  if (!calibLocked) {
-    // Heuristic: for a centred face, face.y + face.h/2 ≈ face centre on canvas.
-    // We record face.w to later derive the eye offset ratio.
-    calibSamples.push(face.w)
-    calibProgress = Math.round((calibSamples.length / CALIB_FRAMES) * 100)
-
-    if (calibSamples.length >= CALIB_FRAMES) {
-      // Converge: use the median face.w sample to avoid outliers.
-      const sorted   = [...calibSamples].sort((a, b) => a - b)
-      const medianW  = sorted[Math.floor(sorted.length / 2)]
-      // NN_DEFAULT places its center between eyes and nose bridge.
-      // Empirical offset for the DEFAULT model: eyes are ~0.18 × face.w above center.
-      // We keep EYE_RATIO_DEFAULT as-is; calibration mainly validates the model is stable.
-      eyeOffsetRatio = EYE_RATIO_DEFAULT
-      calibLocked    = true
-      calibProgress  = 100
-      recommendationCard.style.boxShadow = '0 0 0 2px var(--success), 0 14px 30px rgba(125, 227, 161, 0.15)'
-    } else {
-      faceShapeValue.textContent = `Calibrating… ${calibProgress}%`
-      return // don't run shape analysis until calibration is done
-    }
-  }
-
-  // ── Face Shape Analysis ──────────────────────────────────────────────────
-  if (analysisComplete) return
-
   const ratio = face.w / face.h
   faceRatioSamples.push(ratio)
 
   if (faceRatioSamples.length >= 30) {
     analysisComplete = true
     const avgRatio = faceRatioSamples.reduce((a, b) => a + b, 0) / faceRatioSamples.length
-
     if (avgRatio > 0.82) {
       faceShapeValue.textContent = 'Round / Square'
       recommendationText.textContent = 'Angular frames like rectangles or wayfarers will add great contrast to your face.'
@@ -357,6 +320,7 @@ function analyzeFaceShape(detectState) {
       faceShapeValue.textContent = 'Oval / Long'
       recommendationText.textContent = 'Most frames suit you! Try oversized or round frames to complement your proportions.'
     }
+    recommendationCard.style.boxShadow = '0 0 0 2px var(--success), 0 14px 30px rgba(125, 227, 161, 0.15)'
   } else {
     faceShapeValue.textContent = `Analyzing… ${Math.round((faceRatioSamples.length / 30) * 100)}%`
   }
@@ -414,6 +378,7 @@ async function initJeeliz(bestVideoSettings) {
       setTrackingState('Searching')
       startButton.textContent = 'Camera active'
       startButton.disabled = true
+      dragHint.hidden = false
     },
     callbackTrack: (detectState) => {
       handleDetectionState(detectState)
@@ -482,11 +447,44 @@ async function startExperience() {
 
 startButton.addEventListener('click', startExperience)
 
+// ─── Drag gesture: slide glasses up/down ────────────────────────────────────
+// Touch or mouse drag anywhere on the camera stage adjusts userYOffset.
+// Drag UP   → glasses move UP   (negative delta in screen Y → subtract from offset)
+// Drag DOWN → glasses move DOWN (positive delta in screen Y → add to offset)
+const MAX_DRAG = 300 // px — clamp so glasses can't leave the face entirely
+
+const cameraStage = document.querySelector('.camera-stage')
+
+cameraStage.addEventListener('touchstart', (e) => {
+  // Only start drag if camera is running (button disabled = active)
+  if (!startButton.disabled) return
+  dragStartY = e.touches[0].clientY
+}, { passive: true })
+
+cameraStage.addEventListener('touchmove', (e) => {
+  if (dragStartY === null) return
+  const dy = e.touches[0].clientY - dragStartY
+  userYOffset = Math.max(-MAX_DRAG, Math.min(MAX_DRAG, userYOffset - dy))
+  dragStartY  = e.touches[0].clientY
+}, { passive: true })
+
+cameraStage.addEventListener('touchend', () => { dragStartY = null })
+
+// Mouse fallback (desktop testing)
+cameraStage.addEventListener('mousedown', (e) => {
+  if (!startButton.disabled) return
+  dragStartY = e.clientY
+})
+document.addEventListener('mousemove', (e) => {
+  if (dragStartY === null) return
+  const dy = e.clientY - dragStartY
+  userYOffset = Math.max(-MAX_DRAG, Math.min(MAX_DRAG, userYOffset - dy))
+  dragStartY  = e.clientY
+})
+document.addEventListener('mouseup', () => { dragStartY = null })
+
 // ─── Background preload (starts right after UI render) ─────────────────────
-// 1. Jeeliz JS scripts
 setTimeout(preloadScriptsSilently, 100)
-// 2. Neural network JSON — prefetch into browser cache so fetch() is instant
 setTimeout(() => {
   fetch('/jeeliz/neuralNets/NN_DEFAULT.json').catch(() => {})
 }, 200)
-

@@ -281,3 +281,25 @@ select {
   color: rgba(246, 241, 232, 0.72);
   letter-spacing: 0.04em;
 }
+
+/* ─── Drag Hint ────────────────────────────────────────── */
+
+.drag-hint {
+  text-align: center;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0.5rem 0 0 0;
+  letter-spacing: 0.05em;
+  pointer-events: auto; /* Allow dragging over it */
+  animation: pulse 2s infinite;
+}
+
+.drag-hint[hidden] {
+  display: none !important;
+}
+
+@keyframes pulse {
+  0% { opacity: 0.4; }
+  50% { opacity: 1; }
+  100% { opacity: 0.4; }
+}
