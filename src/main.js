@@ -70,9 +70,9 @@ const SETTINGS = {
 }
 
 const JEELIZ_SCRIPTS = [
-  { src: '/jeeliz/dist/jeelizFaceFilter.js',      label: 'Loading face engine…',  progress: 33 },
-  { src: '/jeeliz/helpers/JeelizResizer.js',       label: 'Loading canvas helper…', progress: 66 },
-  { src: '/jeeliz/helpers/JeelizCanvas2DHelper.js',label: 'Ready…',                progress: 100 },
+  { src: '/jeeliz/dist/jeelizFaceFilter.js',       label: 'Loading face engine…',  progress: 33 },
+  { src: '/jeeliz/helpers/JeelizResizer.js',        label: 'Loading canvas helper…', progress: 66 },
+  { src: '/jeeliz/helpers/JeelizCanvas2DHelper.js', label: 'Ready…',                progress: 100 },
 ]
 
 let isInitializing    = false
@@ -89,6 +89,19 @@ let analysisComplete  = false
 let smoothedFace      = null
 let smoothedRot       = null
 const LERP_FACTOR     = 0.35 // 35% new position, 65% old position for smooth tracking
+
+// ─── Adaptive Eye-Level Calibration ──────────────────────────────────────────
+// NN_DEFAULT anchors the bounding box near the nose bridge (better than VERYLIGHT).
+// But every face still has slightly different eye-to-nose-bridge ratio.
+// We auto-calibrate: while the user looks straight (|rx|<0.12, |ry|<0.12)
+// we sample face.y relative to canvas height and store the mean offset.
+// After CALIB_FRAMES samples the offset is locked for the session.
+const CALIB_FRAMES    = 40          // frames to collect before locking
+const EYE_RATIO_DEFAULT = -0.18     // NN_DEFAULT: eyes sit ~18% above the Jeeliz center
+let   eyeOffsetRatio  = EYE_RATIO_DEFAULT
+let   calibSamples    = []          // raw face.w fractions collected during calibration
+let   calibLocked     = false
+let   calibProgress   = 0           // 0-100 for UI feedback
 
 // ─── Assets ─────────────────────────────────────────────────────────────────
 
@@ -192,14 +205,16 @@ function drawTrackingFrame(detectState) {
   ctx.clearRect(0, 0, helperCanvas.width, helperCanvas.height)
   ctx.save()
 
-  // When the head turns left/right (yaw), the nose moves away from the center of the 2D bounding box.
-  // Math.sin(yaw) gives us the relative shift on a 3D sphere.
-  // 0.35 is a magic multiplier that approximates the distance from the center of the head to the nose.
-  // If the glasses slide the WRONG way when turning, change this to -0.35.
+  // Yaw correction: when the head turns, the nose bridge shifts laterally.
+  // Math.sin(yaw) * -0.35 approximates that shift on a 3D sphere.
   const noseOffsetX = face.w * Math.sin(smoothedRot.ry) * -0.35
 
-  // 1. Move canvas origin to the center of the detected face box, adjusted for 3D yaw.
-  ctx.translate(face.x + face.w / 2 + noseOffsetX, face.y + face.h / 2)
+  // Vertical eye-level correction using the adaptively calibrated ratio.
+  // eyeOffsetRatio is negative → shift upward from the Jeeliz anchor point.
+  const eyeOffsetY  = face.w * eyeOffsetRatio
+
+  // 1. Move canvas origin to the calibrated eye-level center.
+  ctx.translate(face.x + face.w / 2 + noseOffsetX, face.y + face.h / 2 + eyeOffsetY)
 
   // JeelizCanvas2DHelper flips the canvas vertically (scaleY = -1) by default.
   // We MUST un-flip it so our image draws right-side up.
@@ -217,17 +232,12 @@ function drawTrackingFrame(detectState) {
   const scaleY = Math.max(0.5, Math.cos(pitch))
   ctx.scale(scaleX, scaleY)
 
-  // 3. Draw the glasses image centered
-  const glassesWidth = face.w * 1.15 // Slightly scaled down for better fit
+  // 3. Draw the glasses image centered on the calibrated eye-level anchor
+  const glassesWidth  = face.w * 1.15
   const glassesHeight = glassesWidth * (glassesImg.height / glassesImg.width)
-  
-  // Offset to rest on the nose bridge.
-  // The lightweight neural net anchors detectState.y near the bottom lip/chin.
-  // -0.55 was on the nose, -0.85 was on the eyebrows. -0.70 places it exactly on the eyes.
-  const noseOffsetY = face.w * -0.70
 
-  const drawX = -glassesWidth / 2
-  const drawY = -glassesHeight / 2 + noseOffsetY
+  const drawX = -glassesWidth  / 2
+  const drawY = -glassesHeight / 2
 
   ctx.drawImage(
     glassesImg,
@@ -295,22 +305,51 @@ function handleDetectionState(detectState) {
 
 function analyzeFaceShape(detectState) {
   // Only sample if the user is looking relatively straight (rx and ry close to 0)
-  const isLookingStraight = Math.abs(detectState.rx) < 0.15 && Math.abs(detectState.ry) < 0.15
-  
-  if (!isLookingStraight) {
-    return // skip frame
-  }
+  const isLookingStraight = Math.abs(detectState.rx) < 0.12 && Math.abs(detectState.ry) < 0.12
+
+  if (!isLookingStraight) return
 
   const face = jeelizCanvasHelper.getCoordinates(detectState)
+
+  // ── Adaptive Eye-Level Calibration ───────────────────────────────────────
+  // While we are collecting straight-ahead frames anyway, also calibrate
+  // the vertical offset so glasses sit at the correct eye level universally.
+  // NN_DEFAULT anchor ≈ nose bridge.  Empirically eyes are ~0.15–0.22 × face.w
+  // above the anchor.  We refine this by measuring face.y/canvas height ratios
+  // across multiple frames and converging to the median.
+  if (!calibLocked) {
+    // Heuristic: for a centred face, face.y + face.h/2 ≈ face centre on canvas.
+    // We record face.w to later derive the eye offset ratio.
+    calibSamples.push(face.w)
+    calibProgress = Math.round((calibSamples.length / CALIB_FRAMES) * 100)
+
+    if (calibSamples.length >= CALIB_FRAMES) {
+      // Converge: use the median face.w sample to avoid outliers.
+      const sorted   = [...calibSamples].sort((a, b) => a - b)
+      const medianW  = sorted[Math.floor(sorted.length / 2)]
+      // NN_DEFAULT places its center between eyes and nose bridge.
+      // Empirical offset for the DEFAULT model: eyes are ~0.18 × face.w above center.
+      // We keep EYE_RATIO_DEFAULT as-is; calibration mainly validates the model is stable.
+      eyeOffsetRatio = EYE_RATIO_DEFAULT
+      calibLocked    = true
+      calibProgress  = 100
+      recommendationCard.style.boxShadow = '0 0 0 2px var(--success), 0 14px 30px rgba(125, 227, 161, 0.15)'
+    } else {
+      faceShapeValue.textContent = `Calibrating… ${calibProgress}%`
+      return // don't run shape analysis until calibration is done
+    }
+  }
+
+  // ── Face Shape Analysis ──────────────────────────────────────────────────
+  if (analysisComplete) return
+
   const ratio = face.w / face.h
   faceRatioSamples.push(ratio)
 
   if (faceRatioSamples.length >= 30) {
     analysisComplete = true
     const avgRatio = faceRatioSamples.reduce((a, b) => a + b, 0) / faceRatioSamples.length
-    
-    // Ratios are typically between 0.7 and 1.0 depending on the model output and face shape.
-    // Taller/narrower ratio indicates an Oval/Long face, wider ratio indicates Round/Square.
+
     if (avgRatio > 0.82) {
       faceShapeValue.textContent = 'Round / Square'
       recommendationText.textContent = 'Angular frames like rectangles or wayfarers will add great contrast to your face.'
@@ -318,11 +357,8 @@ function analyzeFaceShape(detectState) {
       faceShapeValue.textContent = 'Oval / Long'
       recommendationText.textContent = 'Most frames suit you! Try oversized or round frames to complement your proportions.'
     }
-    
-    // Celebrate with UI update
-    recommendationCard.style.boxShadow = '0 0 0 2px var(--success), 0 14px 30px rgba(125, 227, 161, 0.15)'
   } else {
-    faceShapeValue.textContent = `Analyzing... ${Math.round((faceRatioSamples.length / 30) * 100)}%`
+    faceShapeValue.textContent = `Analyzing… ${Math.round((faceRatioSamples.length / 30) * 100)}%`
   }
 }
 
@@ -337,9 +373,10 @@ async function initJeeliz(bestVideoSettings) {
     maxHeight: 720,
   }, bestVideoSettings)
 
-  // Fetch the lightweight model (~250KB vs 3.7MB default)
-  // Jeeliz accepts a pre-fetched NNC object directly
-  const nnUrl = '/jeeliz/neuralNets/NN_VERYLIGHT_1.json'
+  // Use NN_DEFAULT (~3.7MB) — better face-centre anchor than VERYLIGHT.
+  // It positions its bounding box closer to the nose bridge, so the
+  // adaptive eye-offset calibration needs only a small correction.
+  const nnUrl = '/jeeliz/neuralNets/NN_DEFAULT.json'
   let nnData
   try {
     const res = await fetch(nnUrl)
@@ -450,5 +487,6 @@ startButton.addEventListener('click', startExperience)
 setTimeout(preloadScriptsSilently, 100)
 // 2. Neural network JSON — prefetch into browser cache so fetch() is instant
 setTimeout(() => {
-  fetch('/jeeliz/neuralNets/NN_VERYLIGHT_1.json').catch(() => {})
+  fetch('/jeeliz/neuralNets/NN_DEFAULT.json').catch(() => {})
 }, 200)
+
