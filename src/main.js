@@ -38,7 +38,7 @@ app.innerHTML = `
           </div>
         </div>
 
-        <input type="range" id="yOffsetSlider" class="vertical-slider" min="-150" max="150" value="0" orient="vertical" hidden>
+        <input type="range" id="yOffsetSlider" class="vertical-slider" min="-100" max="100" value="0" orient="vertical" hidden>
 
         <div id="loadingOverlay" class="loading-overlay" hidden>
           <div class="loading-bar-wrap">
@@ -96,7 +96,7 @@ const LERP_FACTOR     = 0.35 // 35% new position, 65% old position for smooth tr
 // NN_DEFAULT anchors near the nose bridge; 0.15 (15% of face width UP) is a good neutral starting point for eyes.
 // The user can use the slider to fine-tune this offset at runtime.
 const EYE_RATIO_BASE  = 0.15        // fraction of face.w to shift upward
-let   userYOffset     = 0           // extra pixels from slider
+let   userYOffsetRatio= 0           // extra ratio from slider
 
 // ─── Assets ─────────────────────────────────────────────────────────────────
 
@@ -205,8 +205,8 @@ function drawTrackingFrame(detectState) {
   const noseOffsetX = face.w * Math.sin(smoothedRot.ry) * -0.35
 
   // Vertical correction: positive = UP (applied before scale(1,-1) which flips Y).
-  // userYOffset is in screen pixels from drag (negative = user dragged DOWN → lower glasses).
-  const eyeOffsetY  = face.w * EYE_RATIO_BASE + userYOffset
+  // userYOffsetRatio is driven by the slider (-1.0 to +1.0 relative to face width).
+  const eyeOffsetY  = face.w * (EYE_RATIO_BASE + userYOffsetRatio)
 
   // 1. Move canvas origin to the eye-level anchor.
   ctx.translate(face.x + face.w / 2 + noseOffsetX, face.y + face.h / 2 - eyeOffsetY)
@@ -445,7 +445,8 @@ startButton.addEventListener('click', startExperience)
 // ─── Slider gesture: slide glasses up/down ────────────────────────────────────
 yOffsetSlider.addEventListener('input', (e) => {
   // Invert the value so that sliding UP visually moves the glasses UP.
-  userYOffset = -parseInt(e.target.value, 10)
+  // Slider gives -100 to +100, which maps to -1.0 to +1.0 of the face width.
+  userYOffsetRatio = -(parseInt(e.target.value, 10) / 100)
 })
 
 // ─── Background preload (starts right after UI render) ─────────────────────
