@@ -84,7 +84,8 @@ const EMA_ALPHA = 0.4 // 0.0 to 1.0 (lower is smoother but lags more)
 let userYOffsetRatio = 0
 
 yOffsetSlider.addEventListener('input', (e) => {
-  userYOffsetRatio = -(parseInt(e.target.value, 10) / 100)
+  // Divisor increased to 400 to make the slider 4x tighter/slower for fine micro-adjustments
+  userYOffsetRatio = -(parseInt(e.target.value, 10) / 400)
 })
 
 // ─── UI Helpers ────────────────────────────────────────────────────────────
