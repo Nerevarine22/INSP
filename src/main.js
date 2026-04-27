@@ -93,9 +93,9 @@ const LERP_FACTOR     = 0.35 // 35% new position, 65% old position for smooth tr
 // ─── Eye-Level Offset ────────────────────────────────────────────────────────
 // eyeOffsetY is applied in ctx.translate() BEFORE ctx.scale(1,-1).
 // Because of that flip, POSITIVE values move the glasses UP on screen.
-// NN_DEFAULT anchors near the nose bridge; -0.05 is a good neutral starting point.
+// NN_DEFAULT anchors near the nose bridge; 0.15 (15% of face width UP) is a good neutral starting point for eyes.
 // The user can use the slider to fine-tune this offset at runtime.
-const EYE_RATIO_BASE  = -0.05       // fraction of face.w to shift upward
+const EYE_RATIO_BASE  = 0.15        // fraction of face.w to shift upward
 let   userYOffset     = 0           // extra pixels from slider
 
 // ─── Assets ─────────────────────────────────────────────────────────────────
@@ -444,7 +444,8 @@ startButton.addEventListener('click', startExperience)
 
 // ─── Slider gesture: slide glasses up/down ────────────────────────────────────
 yOffsetSlider.addEventListener('input', (e) => {
-  userYOffset = parseInt(e.target.value, 10)
+  // Invert the value so that sliding UP visually moves the glasses UP.
+  userYOffset = -parseInt(e.target.value, 10)
 })
 
 // ─── Background preload (starts right after UI render) ─────────────────────
