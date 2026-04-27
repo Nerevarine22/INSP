@@ -235,12 +235,12 @@ function renderLoop() {
 
 function drawGlasses(ctx, landmarks, matrix, w, h) {
   // Landmarks to use:
-  // 168: Between eyebrows (center of glasses bridge)
+  // 6: Nose bridge (sits lower and closer to the face than 168)
   // 33: Left eye outer corner
   // 263: Right eye outer corner
   // 4: Nose tip (for yaw/pitch fallback)
 
-  const ptCenter = landmarks[168]
+  const ptCenter = landmarks[6]
   const ptLeftEye = landmarks[33]
   const ptRightEye = landmarks[263]
   
@@ -258,8 +258,8 @@ function drawGlasses(ctx, landmarks, matrix, w, h) {
   // Distance between outer eye corners (pixels)
   const eyeDistance = Math.sqrt(Math.pow(rx - lx, 2) + Math.pow(ry - ly, 2))
   
-  // Glasses width should be wider than the eye distance. 2.2x is a good starting point.
-  const glassesWidth = eyeDistance * 2.2
+  // Glasses width should be wider than the eye distance. 1.55x is reduced by 30% from the previous 2.2x.
+  const glassesWidth = eyeDistance * 1.55
   const glassesHeight = glassesWidth * (glassesImg.height / glassesImg.width)
   
   // Calculate Roll (tilt left/right). 
@@ -312,7 +312,7 @@ function drawGlasses(ctx, landmarks, matrix, w, h) {
   // Apply Y offset from slider (userYOffsetRatio is a fraction of the glasses width)
   const yOffset = smoothedPos.w * userYOffsetRatio
 
-  // Move to anchor (pt 168 is exactly on the nose bridge, which is the perfect anchor for glasses)
+  // Move to anchor (pt 6 is lower on the nose bridge, closer to where glasses naturally rest)
   ctx.translate(smoothedPos.x, smoothedPos.y - yOffset)
   
   // Rotate
