@@ -73,7 +73,7 @@ let lastVideoTime = -1
 
 // ─── Constants & State ───────────────────────────────────────────────────────
 const glassesImg = new Image()
-glassesImg.src = '/glasses.svg'
+glassesImg.src = '/pngwing.com.png'
 
 // EMA Smoothing state
 let smoothedPos = { x: 0, y: 0, w: 0, roll: 0, pitch: 0, yaw: 0 }
