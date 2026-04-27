@@ -97,7 +97,7 @@ const LERP_FACTOR     = 0.35 // 35% new position, 65% old position for smooth tr
 // we sample face.y relative to canvas height and store the mean offset.
 // After CALIB_FRAMES samples the offset is locked for the session.
 const CALIB_FRAMES    = 40          // frames to collect before locking
-const EYE_RATIO_DEFAULT = -0.18     // NN_DEFAULT: eyes sit ~18% above the Jeeliz center
+const EYE_RATIO_DEFAULT = -0.50     // NN_DEFAULT: eyes sit ~50% above the Jeeliz center
 let   eyeOffsetRatio  = EYE_RATIO_DEFAULT
 let   calibSamples    = []          // raw face.w fractions collected during calibration
 let   calibLocked     = false
