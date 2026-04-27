@@ -282,24 +282,21 @@ select {
   letter-spacing: 0.04em;
 }
 
-/* ─── Drag Hint ────────────────────────────────────────── */
+/* ─── Vertical Slider ────────────────────────────────────────── */
 
-.drag-hint {
-  text-align: center;
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.6);
-  margin: 0.5rem 0 0 0;
-  letter-spacing: 0.05em;
-  pointer-events: auto; /* Allow dragging over it */
-  animation: pulse 2s infinite;
+.vertical-slider {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  writing-mode: vertical-lr; /* Better vertical slider support */
+  direction: rtl; /* Values go up from bottom to top */
+  width: 8px;
+  height: 200px;
+  z-index: 20;
+  accent-color: var(--accent);
 }
 
-.drag-hint[hidden] {
+.vertical-slider[hidden] {
   display: none !important;
-}
-
-@keyframes pulse {
-  0% { opacity: 0.4; }
-  50% { opacity: 1; }
-  100% { opacity: 0.4; }
 }

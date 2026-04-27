@@ -24,7 +24,6 @@ app.innerHTML = `
               <span class="metric-label">Smart Stylist</span>
               <strong id="faceShapeValue">Analyzing...</strong>
             </div>
-            <p id="recommendationText" class="recommendation-desc">Please look straight at the camera to determine your face shape.</p>
           </div>
           <!-- Debug metrics hidden for clean UI -->
           <div class="metrics-row" style="display: none;">
@@ -37,8 +36,9 @@ app.innerHTML = `
               <strong id="rotationValue">0 deg, 0 deg, 0 deg</strong>
             </div>
           </div>
-          <p class="drag-hint" id="dragHint" hidden>↕ Drag to adjust</p>
         </div>
+
+        <input type="range" id="yOffsetSlider" class="vertical-slider" min="-150" max="150" value="0" orient="vertical" hidden>
 
         <div id="loadingOverlay" class="loading-overlay" hidden>
           <div class="loading-bar-wrap">
@@ -57,14 +57,12 @@ const trackingValue   = document.querySelector('#trackingValue')
 const rotationValue   = document.querySelector('#rotationValue')
 const statusDot       = document.querySelector('#statusDot')
 const canvas          = document.querySelector('#jeeFaceFilterCanvas')
-const loadingOverlay  = document.querySelector('#loadingOverlay')
 const loadingBar      = document.querySelector('#loadingBar')
 const loadingLabel    = document.querySelector('#loadingLabel')
-const dragHint        = document.querySelector('#dragHint')
+const yOffsetSlider   = document.querySelector('#yOffsetSlider')
 
 const recommendationCard = document.querySelector('#recommendationCard')
 const faceShapeValue     = document.querySelector('#faceShapeValue')
-const recommendationText = document.querySelector('#recommendationText')
 
 const SETTINGS = {
   detectionThreshold: 0.82,
@@ -95,11 +93,10 @@ const LERP_FACTOR     = 0.35 // 35% new position, 65% old position for smooth tr
 // ─── Eye-Level Offset ────────────────────────────────────────────────────────
 // eyeOffsetY is applied in ctx.translate() BEFORE ctx.scale(1,-1).
 // Because of that flip, POSITIVE values move the glasses UP on screen.
-// NN_DEFAULT anchors near the nose bridge; +0.70 brings us to eye level.
-// The user can drag the camera stage to fine-tune this offset at runtime.
-const EYE_RATIO_BASE  = 0.70        // fraction of face.w to shift upward
-let   userYOffset     = 0           // extra pixels from drag gesture (screen coords)
-let   dragStartY      = null        // touchstart / mousedown Y
+// NN_DEFAULT anchors near the nose bridge; -0.05 is a good neutral starting point.
+// The user can use the slider to fine-tune this offset at runtime.
+const EYE_RATIO_BASE  = -0.05       // fraction of face.w to shift upward
+let   userYOffset     = 0           // extra pixels from slider
 
 // ─── Assets ─────────────────────────────────────────────────────────────────
 
@@ -315,10 +312,8 @@ function analyzeFaceShape(detectState) {
     const avgRatio = faceRatioSamples.reduce((a, b) => a + b, 0) / faceRatioSamples.length
     if (avgRatio > 0.82) {
       faceShapeValue.textContent = 'Round / Square'
-      recommendationText.textContent = 'Angular frames like rectangles or wayfarers will add great contrast to your face.'
     } else {
       faceShapeValue.textContent = 'Oval / Long'
-      recommendationText.textContent = 'Most frames suit you! Try oversized or round frames to complement your proportions.'
     }
     recommendationCard.style.boxShadow = '0 0 0 2px var(--success), 0 14px 30px rgba(125, 227, 161, 0.15)'
   } else {
@@ -378,7 +373,7 @@ async function initJeeliz(bestVideoSettings) {
       setTrackingState('Searching')
       startButton.textContent = 'Camera active'
       startButton.disabled = true
-      dragHint.hidden = false
+      yOffsetSlider.hidden = false
     },
     callbackTrack: (detectState) => {
       handleDetectionState(detectState)
@@ -447,41 +442,10 @@ async function startExperience() {
 
 startButton.addEventListener('click', startExperience)
 
-// ─── Drag gesture: slide glasses up/down ────────────────────────────────────
-// Touch or mouse drag anywhere on the camera stage adjusts userYOffset.
-// Drag UP   → glasses move UP   (negative delta in screen Y → subtract from offset)
-// Drag DOWN → glasses move DOWN (positive delta in screen Y → add to offset)
-const MAX_DRAG = 300 // px — clamp so glasses can't leave the face entirely
-
-const cameraStage = document.querySelector('.camera-stage')
-
-cameraStage.addEventListener('touchstart', (e) => {
-  // Only start drag if camera is running (button disabled = active)
-  if (!startButton.disabled) return
-  dragStartY = e.touches[0].clientY
-}, { passive: true })
-
-cameraStage.addEventListener('touchmove', (e) => {
-  if (dragStartY === null) return
-  const dy = e.touches[0].clientY - dragStartY
-  userYOffset = Math.max(-MAX_DRAG, Math.min(MAX_DRAG, userYOffset - dy))
-  dragStartY  = e.touches[0].clientY
-}, { passive: true })
-
-cameraStage.addEventListener('touchend', () => { dragStartY = null })
-
-// Mouse fallback (desktop testing)
-cameraStage.addEventListener('mousedown', (e) => {
-  if (!startButton.disabled) return
-  dragStartY = e.clientY
+// ─── Slider gesture: slide glasses up/down ────────────────────────────────────
+yOffsetSlider.addEventListener('input', (e) => {
+  userYOffset = parseInt(e.target.value, 10)
 })
-document.addEventListener('mousemove', (e) => {
-  if (dragStartY === null) return
-  const dy = e.clientY - dragStartY
-  userYOffset = Math.max(-MAX_DRAG, Math.min(MAX_DRAG, userYOffset - dy))
-  dragStartY  = e.clientY
-})
-document.addEventListener('mouseup', () => { dragStartY = null })
 
 // ─── Background preload (starts right after UI render) ─────────────────────
 setTimeout(preloadScriptsSilently, 100)
