@@ -11,5 +11,8 @@
   "devDependencies": {
     "vite": "^5.4.19",
     "vite-plugin-compression": "^0.5.1"
+  },
+  "dependencies": {
+    "@mediapipe/tasks-vision": "^0.10.34"
   }
 }
