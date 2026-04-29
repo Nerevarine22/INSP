@@ -115,6 +115,25 @@ select {
   margin-bottom: 0.4rem;
 }
 
+.rec-body {
+  margin-top: 0.8rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.rec-advice {
+  margin: 0 0 0.6rem 0;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.9);
+  line-height: 1.4;
+}
+
+.rec-models {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--accent);
+}
+
 .recommendation-desc {
   margin: 0;
   font-size: 0.9rem;

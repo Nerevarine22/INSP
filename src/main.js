@@ -22,8 +22,11 @@ app.innerHTML = `
         <div class="overlay bottom-overlay">
           <div class="recommendation-card" id="recommendationCard" hidden>
             <div class="rec-header">
-              <span class="metric-label">Smart Stylist</span>
-              <strong id="faceShapeValue">Analyzing...</strong>
+              <span class="metric-label">Smart Stylist: <strong id="faceShapeCategory" style="color: var(--accent);">Analyzing...</strong></span>
+            </div>
+            <div class="rec-body" id="recBody" hidden>
+              <p class="rec-advice" id="faceShapeAdvice"></p>
+              <p class="rec-models"><strong>Моделі:</strong> <span id="faceShapeModels"></span></p>
             </div>
           </div>
           <div class="metrics-row" style="display: none;">
@@ -63,13 +66,20 @@ const loadingBar      = document.querySelector('#loadingBar')
 const loadingLabel    = document.querySelector('#loadingLabel')
 const yOffsetSlider   = document.querySelector('#yOffsetSlider')
 const recommendationCard = document.querySelector('#recommendationCard')
-const faceShapeValue     = document.querySelector('#faceShapeValue')
+const faceShapeCategory  = document.querySelector('#faceShapeCategory')
+const recBody            = document.querySelector('#recBody')
+const faceShapeAdvice    = document.querySelector('#faceShapeAdvice')
+const faceShapeModels    = document.querySelector('#faceShapeModels')
 
 let isInitializing = false
 let isTracking = false
 let faceLandmarker = null
 let animationId = null
 let lastVideoTime = -1
+
+// Smart Stylist Debounce State
+let shapeDetectTimeout = null
+let currentCategoryStr = null
 
 // ─── Constants & State ───────────────────────────────────────────────────────
 const glassesImg = new Image()
@@ -224,6 +234,12 @@ function renderLoop() {
       const matrix = results.facialTransformationMatrixes ? results.facialTransformationMatrixes[0] : null
       
       drawGlasses(ctx, landmarks, matrix, canvas.width, canvas.height)
+    } else {
+      recommendationCard.hidden = true;
+      recBody.hidden = true;
+      faceShapeCategory.textContent = 'Analyzing...';
+      currentCategoryStr = null;
+      if (shapeDetectTimeout) clearTimeout(shapeDetectTimeout);
     }
   } else {
     // If we didn't process a new video frame, we still draw the last smoothed position to prevent flicker.
@@ -335,19 +351,69 @@ function drawGlasses(ctx, landmarks, matrix, w, h) {
   
   ctx.restore()
   
-  // Face Shape detection (Simple version based on face contour landmarks 10 (top) and 152 (bottom) vs 234 (left) and 454 (right))
-  const top = landmarks[10], bottom = landmarks[152]
-  const left = landmarks[234], right = landmarks[454]
-  const faceHeight = bottom.y - top.y
-  const faceWidth = right.x - left.x // normalized coordinates
+  // Face Shape detection using FR, JFR, and Angular Level
+  const ptTop = landmarks[10], ptChin = landmarks[152]
+  const ptLeftCheek = landmarks[234], ptRightCheek = landmarks[454]
+  const ptLeftJaw = landmarks[132], ptRightJaw = landmarks[361]
+  const ptLeftForehead = landmarks[103], ptRightForehead = landmarks[332]
   
-  const faceRatio = faceWidth / faceHeight
+  // FR: Height / Width
+  const faceHeight = ptChin.y - ptTop.y
+  const faceWidth = ptRightCheek.x - ptLeftCheek.x
+  const FR = faceHeight / faceWidth
   
-  if (faceRatio > 0.80) {
-    faceShapeValue.textContent = 'Round / Square'
-  } else {
-    faceShapeValue.textContent = 'Oval / Long'
+  // JFR: Jaw Width / Forehead Width
+  const jawWidth = ptRightJaw.x - ptLeftJaw.x
+  const foreheadWidth = ptRightForehead.x - ptLeftForehead.x
+  const JFR = jawWidth / foreheadWidth
+  
+  // Angular Level: Angle between ear->jaw (234->132) and jaw->chin (132->152)
+  const v1Lx = ptLeftJaw.x - ptLeftCheek.x
+  const v1Ly = ptLeftJaw.y - ptLeftCheek.y
+  const v2Lx = ptChin.x - ptLeftJaw.x
+  const v2Ly = ptChin.y - ptLeftJaw.y
+  
+  const dotL = v1Lx * v2Lx + v1Ly * v2Ly
+  const mag1L = Math.sqrt(v1Lx*v1Lx + v1Ly*v1Ly)
+  const mag2L = Math.sqrt(v2Lx*v2Lx + v2Ly*v2Ly)
+  let angleL = 180
+  if (mag1L > 0 && mag2L > 0) {
+    angleL = Math.acos(dotL / (mag1L * mag2L)) * (180 / Math.PI)
   }
+  
+  // If angle is sharp (< 145 deg) or jaw is wide, it's angular
+  const isAngular = (JFR > 0.95 || angleL < 145)
+
+  let category, advice, models
+  if (FR > 1.35) {
+    category = 'Elongated (Подовжене)'
+    advice = 'Оправи, що додають ширини та візуально вкорочують обличчя.'
+    models = 'Aviator (Авіатори), Oversized, Wayfarer'
+  } else if (isAngular) {
+    category = 'Angular (Квадратне/Гостре)'
+    advice = 'Оправи, що пом\'якшують лінію щелепи та додають плавних ліній.'
+    models = 'Round (Круглі), Oval (Овальні), Panto'
+  } else {
+    category = 'Rounded (Кругле/Серце)'
+    advice = 'Оправи з чіткими кутами, що додають обличчю структури та контрасту.'
+    models = 'Square (Квадратні), Rectangular (Прямокутні), Cat-eye (Котяче око)'
+  }
+
+  if (category !== currentCategoryStr) {
+    currentCategoryStr = category
+    faceShapeCategory.textContent = 'Analyzing...'
+    recBody.hidden = true
+    
+    if (shapeDetectTimeout) clearTimeout(shapeDetectTimeout)
+    
+    shapeDetectTimeout = setTimeout(() => {
+      faceShapeCategory.textContent = category
+      faceShapeAdvice.textContent = advice
+      faceShapeModels.textContent = models
+      recBody.hidden = false
+    }, 2000)
+  }
+
   recommendationCard.hidden = false
   recommendationCard.style.boxShadow = '0 0 0 2px var(--success), 0 14px 30px rgba(125, 227, 161, 0.15)'
 }
