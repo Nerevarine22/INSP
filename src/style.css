@@ -200,6 +200,28 @@ select {
   box-shadow: none;
 }
 
+.secondary-button {
+  pointer-events: auto;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.secondary-button:active {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.secondary-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .metric-card {
   flex: 1 1 0;
   border-radius: 18px;
