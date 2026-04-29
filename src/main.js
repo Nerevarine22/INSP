@@ -14,9 +14,14 @@ app.innerHTML = `
             <span class="status-dot" id="statusDot"></span>
             <span id="statusText">Ready to start camera</span>
           </div>
-          <button id="startButton" class="primary-button" type="button">
-            Start camera
-          </button>
+          <div style="display: flex; gap: 8px;">
+            <button id="startButton" class="primary-button" type="button">
+              Start camera
+            </button>
+            <button id="flipCameraButton" class="secondary-button" style="font-size: 1.2rem; padding: 0.5rem 1rem;" type="button" aria-label="Flip Camera" hidden>
+              🔄
+            </button>
+          </div>
         </div>
 
         <div class="overlay bottom-overlay">
@@ -55,6 +60,7 @@ app.innerHTML = `
 `
 
 const startButton     = document.querySelector('#startButton')
+const flipCameraButton = document.querySelector('#flipCameraButton')
 const statusText      = document.querySelector('#statusText')
 const trackingValue   = document.querySelector('#trackingValue')
 const rotationValue   = document.querySelector('#rotationValue')
@@ -76,6 +82,7 @@ let isTracking = false
 let faceLandmarker = null
 let animationId = null
 let lastVideoTime = -1
+let currentFacingMode = 'user'
 
 // Smart Stylist Debounce State
 let shapeDetectTimeout = null
@@ -188,7 +195,23 @@ function lerp(start, end, amt) {
   return (1 - amt) * start + amt * end
 }
 
-// ─── MediaPipe Initialization ──────────────────────────────────────────────
+async function startCameraStream(facingMode) {
+  if (video.srcObject) {
+    video.srcObject.getTracks().forEach(t => t.stop())
+  }
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: {
+      facingMode: facingMode,
+      width: { ideal: 1280 },
+      height: { ideal: 720 }
+    }
+  })
+  video.srcObject = stream
+  return new Promise(resolve => {
+    video.onloadeddata = () => resolve()
+  })
+}
+
 async function startExperience() {
   if (isInitializing) return
   isInitializing = true
@@ -233,30 +256,22 @@ async function startExperience() {
   setStatus('Requesting camera access…', 'warning')
 
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: 'user',
-        width: { ideal: 1280 },
-        height: { ideal: 720 }
-      }
-    })
+    await startCameraStream(currentFacingMode)
     
-    video.srcObject = stream
-    video.addEventListener('loadeddata', () => {
-      canvas.width = video.videoWidth
-      canvas.height = video.videoHeight
-      
-      hideLoading()
-      setStatus('Tracking active', 'success')
-      setTrackingState('Active')
-      startButton.textContent = 'Camera active'
-      yOffsetSlider.hidden = false
-      isTracking = true
-      isInitializing = false
-      
-      // Start render loop
-      animationId = requestAnimationFrame(renderLoop)
-    })
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+    
+    hideLoading()
+    setStatus('Tracking active', 'success')
+    setTrackingState('Active')
+    startButton.textContent = 'Camera active'
+    yOffsetSlider.hidden = false
+    flipCameraButton.hidden = false
+    isTracking = true
+    isInitializing = false
+    
+    // Start render loop
+    animationId = requestAnimationFrame(renderLoop)
   } catch (err) {
     isInitializing = false
     hideLoading()
@@ -269,6 +284,22 @@ async function startExperience() {
 
 startButton.addEventListener('click', startExperience)
 
+flipCameraButton.addEventListener('click', async () => {
+  if (!isTracking) return
+  currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user'
+  flipCameraButton.disabled = true
+  setStatus('Switching camera...', 'warning')
+  try {
+    await startCameraStream(currentFacingMode)
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+    setStatus('Tracking active', 'success')
+  } catch (e) {
+    setStatus('Camera flip error', 'error')
+  }
+  flipCameraButton.disabled = false
+})
+
 // ─── Render Loop ──────────────────────────────────────────────────────────
 function renderLoop() {
   if (!isTracking) return
@@ -276,10 +307,12 @@ function renderLoop() {
   const ctx = canvas.getContext('2d')
   ctx.clearRect(0, 0, canvas.width, canvas.height)
   
-  // Draw video frame onto canvas (flipped horizontally)
+  // Draw video frame onto canvas (conditionally flipped horizontally)
   ctx.save()
-  ctx.translate(canvas.width, 0)
-  ctx.scale(-1, 1)
+  if (currentFacingMode === 'user') {
+    ctx.translate(canvas.width, 0)
+    ctx.scale(-1, 1)
+  }
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
   ctx.restore()
 
@@ -321,29 +354,28 @@ function drawGlasses(ctx, landmarks, matrix, w, h) {
   const ptLeftEye = landmarks[33]
   const ptRightEye = landmarks[263]
   
+  const flipX = currentFacingMode === 'user';
+  
   // Convert normalized coordinates [0, 1] to pixel coordinates
-  // Note: the canvas image is flipped horizontally!
-  // Since we drew the video flipped, we must also flip the landmark X coordinates.
-  const cx = (1 - ptCenter.x) * w
+  const cx = (flipX ? (1 - ptCenter.x) : ptCenter.x) * w
   const cy = ptCenter.y * h
   
-  const lx = (1 - ptLeftEye.x) * w
+  const lx = (flipX ? (1 - ptLeftEye.x) : ptLeftEye.x) * w
   const ly = ptLeftEye.y * h
-  const rx = (1 - ptRightEye.x) * w
+  const rx = (flipX ? (1 - ptRightEye.x) : ptRightEye.x) * w
   const ry = ptRightEye.y * h
 
   // Distance between outer eye corners (pixels)
   const eyeDistance = Math.sqrt(Math.pow(rx - lx, 2) + Math.pow(ry - ly, 2))
   
-  // Glasses width should be wider than the eye distance. 1.55x is reduced by 30% from the previous 2.2x.
+  // Glasses width should be wider than the eye distance.
   const glassesWidth = eyeDistance * 1.55
   const glassesHeight = glassesWidth * (glassesImg.height / glassesImg.width)
   
-  // Calculate Roll (tilt left/right). 
-  // Angle of the vector from left eye to right eye.
-  // Note: Because we flipped X, lx is right on screen and rx is left on screen.
-  // Vector from rx to lx gives the tilt.
-  const roll = Math.atan2(ly - ry, lx - rx)
+  // Calculate Roll (tilt left/right).
+  const roll = flipX 
+    ? Math.atan2(ly - ry, lx - rx) 
+    : Math.atan2(ry - ly, rx - lx)
 
   // Calculate Yaw and Pitch from Transformation Matrix if available
   let pitch = 0
@@ -412,7 +444,10 @@ function drawGlasses(ctx, landmarks, matrix, w, h) {
   ctx.restore()
   
   // Face Shape detection using Template Similarity
-  const userPts = CONTOUR_INDICES.map(idx => landmarks[idx])
+  const userPts = CONTOUR_INDICES.map(idx => ({
+    x: flipX ? (1 - landmarks[idx].x) : landmarks[idx].x,
+    y: landmarks[idx].y
+  }))
   
   const errors = {
     'Rounded': calculateSimilarity(userPts, FACE_TEMPLATES['Rounded']),
