@@ -81,7 +81,7 @@ let lastVideoTime = -1
 let shapeDetectTimeout = null
 let currentCategoryStr = null
 const faceMetricsBuffer = []
-const MAX_METRICS_BUFFER = 10
+const MAX_METRICS_BUFFER = 15
 
 // ─── Constants & State ───────────────────────────────────────────────────────
 const glassesImg = new Image()
@@ -370,25 +370,25 @@ function drawGlasses(ctx, landmarks, matrix, w, h) {
   const foreheadWidth = ptRightForehead.x - ptLeftForehead.x
   const JFR = jawWidth / foreheadWidth
   
-  // Angular Level: Angle between ear->jaw (234->132) and jaw->chin (132->152)
-  const v1Lx = ptLeftJaw.x - ptLeftCheek.x
-  const v1Ly = ptLeftJaw.y - ptLeftCheek.y
-  const v2Lx = ptChin.x - ptLeftJaw.x
-  const v2Ly = ptChin.y - ptLeftJaw.y
-  
-  const dotL = v1Lx * v2Lx + v1Ly * v2Ly
-  const mag1L = Math.sqrt(v1Lx*v1Lx + v1Ly*v1Ly)
-  const mag2L = Math.sqrt(v2Lx*v2Lx + v2Ly*v2Ly)
-  let angleL = 180
-  if (mag1L > 0 && mag2L > 0) {
-    angleL = Math.acos(dotL / (mag1L * mag2L)) * (180 / Math.PI)
+  // Bezier Offset (BO) Curvature Analysis
+  // Calculate perpendicular distance from jaw corner (P1) to cheek-chin chord (P0-P2)
+  const calcBO = (p0, p1, p2) => {
+    const num = Math.abs((p2.x - p0.x)*(p0.y - p1.y) - (p0.x - p1.x)*(p2.y - p0.y))
+    const den = Math.sqrt(Math.pow(p2.x - p0.x, 2) + Math.pow(p2.y - p0.y, 2))
+    return den > 0 ? num / den : 0
   }
+  
+  const boLeft = calcBO(ptLeftCheek, ptLeftJaw, ptChin)
+  const boRight = calcBO(ptRightCheek, ptRightJaw, ptChin)
+  
+  // Normalize BO to Face Width
+  const avgBO = ((boLeft + boRight) / 2) / faceWidth
   
   // Add to buffer
   if (faceMetricsBuffer.length >= MAX_METRICS_BUFFER) {
     faceMetricsBuffer.shift()
   }
-  faceMetricsBuffer.push({ FR, JFR, angleL })
+  faceMetricsBuffer.push({ FR, JFR, avgBO })
 
   // Calculate medians
   const getMedian = (arr, key) => {
@@ -399,7 +399,7 @@ function drawGlasses(ctx, landmarks, matrix, w, h) {
 
   const medianFR = getMedian(faceMetricsBuffer, 'FR')
   const medianJFR = getMedian(faceMetricsBuffer, 'JFR')
-  const medianAngleL = getMedian(faceMetricsBuffer, 'angleL')
+  const medianBO = getMedian(faceMetricsBuffer, 'avgBO')
 
   // Pitch compensation for JFR (to avoid fake angular shape when looking up/down)
   const pitchPenalty = Math.abs(pitch) * 0.15
@@ -410,7 +410,7 @@ function drawGlasses(ctx, landmarks, matrix, w, h) {
     category = 'Elongated (Подовжене)'
     advice = 'Оправи, що додають ширини та візуально вкорочують обличчя.'
     models = 'Aviator (Авіатори), Oversized, Wayfarer'
-  } else if (correctedJFR > 1.02 && medianAngleL < 140) {
+  } else if ((correctedJFR > 1.02 && medianBO > 0.065) || correctedJFR > 1.05) {
     category = 'Angular (Квадратне/Гостре)'
     advice = 'Оправи, що пом\'якшують лінію щелепи та додають плавних ліній.'
     models = 'Round (Круглі), Oval (Овальні), Panto'
