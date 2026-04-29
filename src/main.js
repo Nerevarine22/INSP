@@ -297,9 +297,13 @@ startButton.addEventListener('click', startExperience)
 
 flipCameraButton.addEventListener('click', async () => {
   if (!isTracking) return
+  isTracking = false
+  if (animationId) cancelAnimationFrame(animationId)
+  
   currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user'
   flipCameraButton.disabled = true
   setStatus('Switching camera...', 'warning')
+  
   try {
     await startCameraStream(currentFacingMode)
     canvas.width = video.videoWidth
@@ -308,12 +312,21 @@ flipCameraButton.addEventListener('click', async () => {
   } catch (e) {
     setStatus('Camera flip error', 'error')
   }
+  
   flipCameraButton.disabled = false
+  isTracking = true
+  lastVideoTime = -1
+  animationId = requestAnimationFrame(renderLoop)
 })
 
 // ─── Render Loop ──────────────────────────────────────────────────────────
 function renderLoop() {
   if (!isTracking) return
+  
+  if (video.readyState < 2) {
+    animationId = requestAnimationFrame(renderLoop)
+    return
+  }
   
   const ctx = canvas.getContext('2d')
   ctx.clearRect(0, 0, canvas.width, canvas.height)
@@ -330,9 +343,14 @@ function renderLoop() {
   let startTimeMs = performance.now()
   if (lastVideoTime !== video.currentTime) {
     lastVideoTime = video.currentTime
-    const results = faceLandmarker.detectForVideo(video, startTimeMs)
+    let results = null
+    try {
+      results = faceLandmarker.detectForVideo(video, startTimeMs)
+    } catch (e) {
+      console.warn("MediaPipe detection skipped frame")
+    }
     
-    if (results.faceLandmarks && results.faceLandmarks.length > 0) {
+    if (results && results.faceLandmarks && results.faceLandmarks.length > 0) {
       const landmarks = results.faceLandmarks[0]
       const matrix = results.facialTransformationMatrixes ? results.facialTransformationMatrixes[0] : null
       
