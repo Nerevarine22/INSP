@@ -199,16 +199,27 @@ async function startCameraStream(facingMode) {
   if (video.srcObject) {
     video.srcObject.getTracks().forEach(t => t.stop())
   }
-  const stream = await navigator.mediaDevices.getUserMedia({
+  
+  const constraints = {
     video: {
-      facingMode: facingMode,
+      facingMode: facingMode === 'environment' ? { ideal: 'environment' } : 'user',
       width: { ideal: 1280 },
       height: { ideal: 720 }
     }
-  })
+  }
+  
+  const stream = await navigator.mediaDevices.getUserMedia(constraints)
   video.srcObject = stream
+  
   return new Promise(resolve => {
-    video.onloadeddata = () => resolve()
+    video.onloadeddata = async () => {
+      try {
+        await video.play()
+      } catch (e) {
+        console.warn('Auto-play failed:', e)
+      }
+      resolve()
+    }
   })
 }
 
