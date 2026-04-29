@@ -92,19 +92,20 @@ const faceMetricsBuffer = []
 const MAX_METRICS_BUFFER = 15
 
 // ─── Constants & State ───────────────────────────────────────────────────────
-const CONTOUR_INDICES = [234, 132, 140, 152, 369, 361, 454]
+const CONTOUR_INDICES = [234, 132, 140, 152, 369, 361, 454, 10]
 
 // Normalized templates (bounding box 0..1, rotated to align eyes)
 // Realistic proportions: cheek-to-chin height is usually 70-80% of face width.
 const FACE_TEMPLATES = {
   'Rounded': [
-    {x: 0.0,  y: 0.0},
-    {x: 0.12, y: 0.45},
-    {x: 0.28, y: 0.65},
-    {x: 0.5,  y: 0.75},
-    {x: 0.72, y: 0.65},
-    {x: 0.88, y: 0.45},
-    {x: 1.0,  y: 0.0}
+    {x: 0.0,  y: 0.0},   // L cheek
+    {x: 0.12, y: 0.45},  // L jaw
+    {x: 0.28, y: 0.65},  // L chin-side
+    {x: 0.5,  y: 0.75},  // Chin
+    {x: 0.72, y: 0.65},  // R chin-side
+    {x: 0.88, y: 0.45},  // R jaw
+    {x: 1.0,  y: 0.0},   // R cheek
+    {x: 0.5,  y: -0.55}  // Top forehead (Total FR ~ 1.30)
   ],
   'Angular': [
     {x: 0.0,  y: 0.0},
@@ -113,16 +114,18 @@ const FACE_TEMPLATES = {
     {x: 0.5,  y: 0.75},
     {x: 0.78, y: 0.70},
     {x: 0.95, y: 0.50},
-    {x: 1.0,  y: 0.0}
+    {x: 1.0,  y: 0.0},
+    {x: 0.5,  y: -0.60} // Top forehead (Total FR ~ 1.35)
   ],
   'Elongated': [
     {x: 0.0,  y: 0.0},
     {x: 0.15, y: 0.55},
     {x: 0.30, y: 0.80},
-    {x: 0.5,  y: 0.95}, // long chin
+    {x: 0.5,  y: 0.90}, // long chin
     {x: 0.70, y: 0.80},
     {x: 0.85, y: 0.55},
-    {x: 1.0,  y: 0.0}
+    {x: 1.0,  y: 0.0},
+    {x: 0.5,  y: -0.65} // Tall forehead (Total FR ~ 1.55)
   ]
 }
 
