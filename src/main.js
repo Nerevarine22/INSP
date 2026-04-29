@@ -80,10 +80,67 @@ let lastVideoTime = -1
 // Smart Stylist Debounce State
 let shapeDetectTimeout = null
 let currentCategoryStr = null
+let currentShapeKey = null
 const faceMetricsBuffer = []
 const MAX_METRICS_BUFFER = 15
 
 // ─── Constants & State ───────────────────────────────────────────────────────
+const CONTOUR_INDICES = [234, 132, 140, 152, 369, 361, 454]
+
+// Normalized templates (bounding box 0..1, rotated to align eyes)
+const FACE_TEMPLATES = {
+  'Rounded': [
+    {x: 0.0, y: 0.0},
+    {x: 0.15, y: 0.65},
+    {x: 0.3, y: 0.9},
+    {x: 0.5, y: 1.0},
+    {x: 0.7, y: 0.9},
+    {x: 0.85, y: 0.65},
+    {x: 1.0, y: 0.0}
+  ],
+  'Angular': [
+    {x: 0.0, y: 0.0},
+    {x: 0.05, y: 0.7},
+    {x: 0.25, y: 0.95},
+    {x: 0.5, y: 1.0},
+    {x: 0.75, y: 0.95},
+    {x: 0.95, y: 0.7},
+    {x: 1.0, y: 0.0}
+  ],
+  'Elongated': [
+    {x: 0.0, y: 0.0},
+    {x: 0.2, y: 0.85},
+    {x: 0.35, y: 1.25},
+    {x: 0.5, y: 1.45},
+    {x: 0.65, y: 1.25},
+    {x: 0.8, y: 0.85},
+    {x: 1.0, y: 0.0}
+  ]
+}
+
+const calculateSimilarity = (userPoints, templatePoints) => {
+  // Translate so pt0 is at (0,0)
+  let pts = userPoints.map(p => ({ x: p.x - userPoints[0].x, y: p.y - userPoints[0].y }))
+  // Rotate so pt6 is at (width, 0)
+  const angle = Math.atan2(pts[6].y, pts[6].x)
+  pts = pts.map(p => ({
+    x: p.x * Math.cos(-angle) - p.y * Math.sin(-angle),
+    y: p.x * Math.sin(-angle) + p.y * Math.cos(-angle)
+  }))
+  // Scale so pt6 is at (1, 0)
+  const scale = pts[6].x > 0 ? 1 / pts[6].x : 0
+  pts = pts.map(p => ({ x: p.x * scale, y: p.y * scale }))
+  
+  // Calculate Euclidean error
+  let error = 0
+  for(let i = 0; i < pts.length; i++) {
+    const dx = pts[i].x - templatePoints[i].x
+    const dy = pts[i].y - templatePoints[i].y
+    error += Math.sqrt(dx*dx + dy*dy)
+  }
+  return error
+}
+
 const glassesImg = new Image()
 glassesImg.src = '/pngwing.com.png'
 
@@ -354,94 +411,63 @@ function drawGlasses(ctx, landmarks, matrix, w, h) {
   
   ctx.restore()
   
-  // Face Shape detection using FR, JFR, and Angular Level
-  const ptTop = landmarks[10], ptChin = landmarks[152]
-  const ptLeftCheek = landmarks[234], ptRightCheek = landmarks[454]
-  const ptLeftJaw = landmarks[132], ptRightJaw = landmarks[361]
-  const ptLeftForehead = landmarks[103], ptRightForehead = landmarks[332]
+  // Face Shape detection using Template Similarity
+  const userPts = CONTOUR_INDICES.map(idx => landmarks[idx])
   
-  // FR: Height / Width
-  const faceHeight = ptChin.y - ptTop.y
-  const faceWidth = ptRightCheek.x - ptLeftCheek.x
-  const FR = faceHeight / faceWidth
-  
-  // JFR: Jaw Width / Forehead Width
-  const jawWidth = ptRightJaw.x - ptLeftJaw.x
-  const foreheadWidth = ptRightForehead.x - ptLeftForehead.x
-  const JFR = jawWidth / foreheadWidth
-  
-  // Bezier Offset (BO) Curvature Analysis
-  // Calculate perpendicular distance from jaw corner (P1) to cheek-chin chord (P0-P2)
-  const calcBO = (p0, p1, p2) => {
-    const num = Math.abs((p2.x - p0.x)*(p0.y - p1.y) - (p0.x - p1.x)*(p2.y - p0.y))
-    const den = Math.sqrt(Math.pow(p2.x - p0.x, 2) + Math.pow(p2.y - p0.y, 2))
-    return den > 0 ? num / den : 0
+  const errors = {
+    'Rounded': calculateSimilarity(userPts, FACE_TEMPLATES['Rounded']),
+    'Angular': calculateSimilarity(userPts, FACE_TEMPLATES['Angular']),
+    'Elongated': calculateSimilarity(userPts, FACE_TEMPLATES['Elongated'])
   }
-  
-  const boLeft = calcBO(ptLeftCheek, ptLeftJaw, ptChin)
-  const boRight = calcBO(ptRightCheek, ptRightJaw, ptChin)
-  
-  // Normalize BO to Face Width
-  const avgBO = ((boLeft + boRight) / 2) / faceWidth
-  
+
   // Add to buffer
   if (faceMetricsBuffer.length >= MAX_METRICS_BUFFER) {
     faceMetricsBuffer.shift()
   }
-  faceMetricsBuffer.push({ FR, JFR, avgBO })
+  faceMetricsBuffer.push(errors)
 
-  // Calculate medians
-  const getMedian = (arr, key) => {
-    const sorted = [...arr].sort((a, b) => a[key] - b[key])
-    const mid = Math.floor(sorted.length / 2)
-    return sorted.length % 2 !== 0 ? sorted[mid][key] : (sorted[mid - 1][key] + sorted[mid][key]) / 2
+  // Average the errors over the buffer
+  const avgErrors = { 'Rounded': 0, 'Angular': 0, 'Elongated': 0 }
+  faceMetricsBuffer.forEach(e => {
+    avgErrors['Rounded'] += e['Rounded']
+    avgErrors['Angular'] += e['Angular']
+    avgErrors['Elongated'] += e['Elongated']
+  })
+  const count = faceMetricsBuffer.length
+  avgErrors['Rounded'] /= count
+  avgErrors['Angular'] /= count
+  avgErrors['Elongated'] /= count
+
+  // Find minimum error
+  let bestShape = Object.keys(avgErrors).reduce((a, b) => avgErrors[a] < avgErrors[b] ? a : b)
+
+  // Soft transition (5% hysteresis margin)
+  if (currentShapeKey && currentShapeKey !== bestShape) {
+    const currentError = avgErrors[currentShapeKey]
+    const bestError = avgErrors[bestShape]
+    // If the new shape isn't at least 5% better than the current one, stick with the current one
+    if (bestError > currentError * 0.95) {
+      bestShape = currentShapeKey
+    }
   }
-
-  const medianFR = getMedian(faceMetricsBuffer, 'FR')
-  const medianJFR = getMedian(faceMetricsBuffer, 'JFR')
-  const medianBO = getMedian(faceMetricsBuffer, 'avgBO')
-
-  const pitchDeg = pitch * (180 / Math.PI)
-  
-  // Base thresholds for Angular
-  let thresholdJFR = 1.05
-  let thresholdBO = 0.08
-
-  // Pitch compensation (якщо нахил більше 10 градусів, збільшуємо пороги на 15%)
-  if (Math.abs(pitchDeg) > 10) {
-    thresholdJFR *= 1.15
-    thresholdBO *= 1.15
-  }
+  currentShapeKey = bestShape
 
   let category, advice
   let recommendedModels = []
 
-  // Base classification
-  if (medianFR > 1.4) {
+  // Assign based on best shape template
+  if (bestShape === 'Elongated') {
     category = 'Elongated (Подовжене)'
-    advice = 'Оправи, що додають ширини та візуально вкорочують обличчя.'
+    advice = 'Обличчя витягнуте: обирайте виключно великі оправи (Oversized, Авіатори).'
     recommendedModels = ['Aviator (Авіатори)', 'Oversized', 'Wayfarer']
-  } else if (medianJFR > thresholdJFR && medianBO > thresholdBO) {
+  } else if (bestShape === 'Angular') {
     category = 'Angular (Квадратне/Гостре)'
-    advice = 'Оправи, що пом\'якшують лінію щелепи та додають плавних ліній.'
+    advice = 'Виражені кути щелепи: пом\'якшуйте лінію обличчя коло/овалом.'
     recommendedModels = ['Round (Круглі)', 'Oval (Овальні)', 'Panto']
   } else {
-    // Default fallback
     category = 'Rounded (Кругле/Серце)'
-    advice = 'Оправи з чіткими кутами, що додають обличчю структури та контрасту.'
+    advice = 'Плавні лінії обличчя: додайте кутів за допомогою прямокутних оправ.'
     recommendedModels = ['Square (Квадратні)', 'Rectangular (Прямокутні)', 'Cat-eye (Котяче око)']
-  }
-
-  // Strict Checks (Overrides / Filtering)
-  if (medianFR > 1.45) {
-    recommendedModels = ['Aviator (Авіатори)', 'Oversized']
-    advice = 'Обличчя витягнуте: обирайте виключно великі оправи (Oversized, Авіатори).'
-  } else if (medianBO > 0.085) {
-    recommendedModels = ['Round (Круглі)', 'Oval (Овальні)']
-    advice = 'Виражені кути щелепи: прямокутні форми заблоковано. Обирайте коло/овал.'
-  } else if (medianBO < 0.035) {
-    recommendedModels = ['Square (Квадратні)', 'Rectangular (Прямокутні)']
-    advice = 'Плавні лінії обличчя: круглі оправи заблоковано. Додайте кутів.'
   }
 
   let models = recommendedModels.join(', ')
