@@ -401,23 +401,32 @@ function drawGlasses(ctx, landmarks, matrix, w, h) {
   const medianJFR = getMedian(faceMetricsBuffer, 'JFR')
   const medianBO = getMedian(faceMetricsBuffer, 'avgBO')
 
-  // Pitch compensation for JFR (to avoid fake angular shape when looking up/down)
-  const pitchPenalty = Math.abs(pitch) * 0.15
-  const correctedJFR = medianJFR - pitchPenalty
+  const pitchDeg = pitch * (180 / Math.PI)
+  
+  // Base thresholds for Angular
+  let thresholdJFR = 1.05
+  let thresholdBO = 0.08
 
-  let category, advice;
-  let recommendedModels = [];
+  // Pitch compensation (якщо нахил більше 10 градусів, збільшуємо пороги на 15%)
+  if (Math.abs(pitchDeg) > 10) {
+    thresholdJFR *= 1.15
+    thresholdBO *= 1.15
+  }
+
+  let category, advice
+  let recommendedModels = []
 
   // Base classification
   if (medianFR > 1.4) {
     category = 'Elongated (Подовжене)'
     advice = 'Оправи, що додають ширини та візуально вкорочують обличчя.'
     recommendedModels = ['Aviator (Авіатори)', 'Oversized', 'Wayfarer']
-  } else if ((correctedJFR > 1.02 && medianBO > 0.065) || correctedJFR > 1.05) {
+  } else if (medianJFR > thresholdJFR && medianBO > thresholdBO) {
     category = 'Angular (Квадратне/Гостре)'
     advice = 'Оправи, що пом\'якшують лінію щелепи та додають плавних ліній.'
     recommendedModels = ['Round (Круглі)', 'Oval (Овальні)', 'Panto']
   } else {
+    // Default fallback
     category = 'Rounded (Кругле/Серце)'
     advice = 'Оправи з чіткими кутами, що додають обличчю структури та контрасту.'
     recommendedModels = ['Square (Квадратні)', 'Rectangular (Прямокутні)', 'Cat-eye (Котяче око)']
@@ -427,7 +436,7 @@ function drawGlasses(ctx, landmarks, matrix, w, h) {
   if (medianFR > 1.45) {
     recommendedModels = ['Aviator (Авіатори)', 'Oversized']
     advice = 'Обличчя витягнуте: обирайте виключно великі оправи (Oversized, Авіатори).'
-  } else if (medianBO > 0.08) {
+  } else if (medianBO > 0.085) {
     recommendedModels = ['Round (Круглі)', 'Oval (Овальні)']
     advice = 'Виражені кути щелепи: прямокутні форми заблоковано. Обирайте коло/овал.'
   } else if (medianBO < 0.035) {
