@@ -405,20 +405,37 @@ function drawGlasses(ctx, landmarks, matrix, w, h) {
   const pitchPenalty = Math.abs(pitch) * 0.15
   const correctedJFR = medianJFR - pitchPenalty
 
-  let category, advice, models
+  let category, advice;
+  let recommendedModels = [];
+
+  // Base classification
   if (medianFR > 1.4) {
     category = 'Elongated (Подовжене)'
     advice = 'Оправи, що додають ширини та візуально вкорочують обличчя.'
-    models = 'Aviator (Авіатори), Oversized, Wayfarer'
+    recommendedModels = ['Aviator (Авіатори)', 'Oversized', 'Wayfarer']
   } else if ((correctedJFR > 1.02 && medianBO > 0.065) || correctedJFR > 1.05) {
     category = 'Angular (Квадратне/Гостре)'
     advice = 'Оправи, що пом\'якшують лінію щелепи та додають плавних ліній.'
-    models = 'Round (Круглі), Oval (Овальні), Panto'
+    recommendedModels = ['Round (Круглі)', 'Oval (Овальні)', 'Panto']
   } else {
     category = 'Rounded (Кругле/Серце)'
     advice = 'Оправи з чіткими кутами, що додають обличчю структури та контрасту.'
-    models = 'Square (Квадратні), Rectangular (Прямокутні), Cat-eye (Котяче око)'
+    recommendedModels = ['Square (Квадратні)', 'Rectangular (Прямокутні)', 'Cat-eye (Котяче око)']
   }
+
+  // Strict Checks (Overrides / Filtering)
+  if (medianFR > 1.45) {
+    recommendedModels = ['Aviator (Авіатори)', 'Oversized']
+    advice = 'Обличчя витягнуте: обирайте виключно великі оправи (Oversized, Авіатори).'
+  } else if (medianBO > 0.08) {
+    recommendedModels = ['Round (Круглі)', 'Oval (Овальні)']
+    advice = 'Виражені кути щелепи: прямокутні форми заблоковано. Обирайте коло/овал.'
+  } else if (medianBO < 0.035) {
+    recommendedModels = ['Square (Квадратні)', 'Rectangular (Прямокутні)']
+    advice = 'Плавні лінії обличчя: круглі оправи заблоковано. Додайте кутів.'
+  }
+
+  let models = recommendedModels.join(', ')
 
   if (category !== currentCategoryStr) {
     currentCategoryStr = category
