@@ -80,6 +80,8 @@ let lastVideoTime = -1
 // Smart Stylist Debounce State
 let shapeDetectTimeout = null
 let currentCategoryStr = null
+const faceMetricsBuffer = []
+const MAX_METRICS_BUFFER = 10
 
 // ─── Constants & State ───────────────────────────────────────────────────────
 const glassesImg = new Image()
@@ -239,6 +241,7 @@ function renderLoop() {
       recBody.hidden = true;
       faceShapeCategory.textContent = 'Analyzing...';
       currentCategoryStr = null;
+      faceMetricsBuffer.length = 0;
       if (shapeDetectTimeout) clearTimeout(shapeDetectTimeout);
     }
   } else {
@@ -381,15 +384,33 @@ function drawGlasses(ctx, landmarks, matrix, w, h) {
     angleL = Math.acos(dotL / (mag1L * mag2L)) * (180 / Math.PI)
   }
   
-  // If angle is sharp (< 145 deg) or jaw is wide, it's angular
-  const isAngular = (JFR > 0.95 || angleL < 145)
+  // Add to buffer
+  if (faceMetricsBuffer.length >= MAX_METRICS_BUFFER) {
+    faceMetricsBuffer.shift()
+  }
+  faceMetricsBuffer.push({ FR, JFR, angleL })
+
+  // Calculate medians
+  const getMedian = (arr, key) => {
+    const sorted = [...arr].sort((a, b) => a[key] - b[key])
+    const mid = Math.floor(sorted.length / 2)
+    return sorted.length % 2 !== 0 ? sorted[mid][key] : (sorted[mid - 1][key] + sorted[mid][key]) / 2
+  }
+
+  const medianFR = getMedian(faceMetricsBuffer, 'FR')
+  const medianJFR = getMedian(faceMetricsBuffer, 'JFR')
+  const medianAngleL = getMedian(faceMetricsBuffer, 'angleL')
+
+  // Pitch compensation for JFR (to avoid fake angular shape when looking up/down)
+  const pitchPenalty = Math.abs(pitch) * 0.15
+  const correctedJFR = medianJFR - pitchPenalty
 
   let category, advice, models
-  if (FR > 1.35) {
+  if (medianFR > 1.4) {
     category = 'Elongated (Подовжене)'
     advice = 'Оправи, що додають ширини та візуально вкорочують обличчя.'
     models = 'Aviator (Авіатори), Oversized, Wayfarer'
-  } else if (isAngular) {
+  } else if (correctedJFR > 1.02 && medianAngleL < 140) {
     category = 'Angular (Квадратне/Гостре)'
     advice = 'Оправи, що пом\'якшують лінію щелепи та додають плавних ліній.'
     models = 'Round (Круглі), Oval (Овальні), Panto'
