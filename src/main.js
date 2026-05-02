@@ -47,6 +47,18 @@ app.innerHTML = `
              <p class="calibration-status" id="calStatus">No samples yet</p>
           </div>
 
+          <!-- Metrics (hidden but needed for stability) -->
+          <div class="metrics-row" style="display: none;">
+            <div class="metric-card">
+              <span class="metric-label">Tracking</span>
+              <strong id="trackingValue">Waiting</strong>
+            </div>
+            <div class="metric-card">
+              <span class="metric-label">Rotation</span>
+              <strong id="rotationValue">0 deg, 0 deg, 0 deg</strong>
+            </div>
+          </div>
+
           <div class="bottom-actions">
             <button id="toggleCalButton" class="secondary-button">Toggle Calibration</button>
             <a href="#stats" id="statsLink" class="secondary-button">Stats Page</a>

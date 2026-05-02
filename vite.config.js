@@ -1,46 +1,13 @@
 import { defineConfig } from 'vite'
 import compression from 'vite-plugin-compression'
+import fs from 'fs/promises'
+import path from 'path'
 
 export default defineConfig({
   publicDir: 'public',
 
   plugins: [
-    // Gzip for maximum browser compatibility
-    compression({
-      algorithm: 'gzip',
-      ext: '.gz',
-      threshold: 512, // compress files > 512 bytes
-    }),
-    // Brotli for modern browsers (smaller than gzip)
-    compression({
-      algorithm: 'brotliCompress',
-      ext: '.br',
-      threshold: 512,
-    }),
-  ],
-
-  build: {
-    // Keep the bundle tiny — Jeeliz loads itself dynamically
-    target: 'es2017',
-    minify: 'esbuild',
-    rollupOptions: {
-      output: {
-        manualChunks: undefined, // single small chunk is fine since Jeeliz is external
-      },
-    },
-  },
-
-  server: {
-    host: true, // Allow access from local network (phone)
-    headers: {
-      // Allow SharedArrayBuffer (needed for some WebGL contexts)
-      'Cross-Origin-Opener-Policy': 'same-origin',
-      'Cross-Origin-Embedder-Policy': 'require-corp',
-    },
-  },
-  
-  // Custom API to save calibration data to local disk
-  plugins: [
+    // 1. Custom API to save calibration data to local disk
     {
       name: 'save-calibration-api',
       configureServer(server) {
@@ -50,8 +17,6 @@ export default defineConfig({
             req.on('data', chunk => { body += chunk.toString(); });
             req.on('end', async () => {
               try {
-                const fs = await import('fs/promises');
-                const path = await import('path');
                 const filePath = path.join(process.cwd(), 'calibration_data.json');
                 
                 let existingData = [];
@@ -85,16 +50,35 @@ export default defineConfig({
         });
       }
     },
-    // Gzip for maximum browser compatibility
+    // 2. Gzip for maximum browser compatibility
     compression({
       algorithm: 'gzip',
       ext: '.gz',
       threshold: 512,
     }),
+    // 3. Brotli for modern browsers
     compression({
       algorithm: 'brotliCompress',
       ext: '.br',
       threshold: 512,
     }),
   ],
+
+  build: {
+    target: 'es2017',
+    minify: 'esbuild',
+    rollupOptions: {
+      output: {
+        manualChunks: undefined,
+      },
+    },
+  },
+
+  server: {
+    host: true, // Allow access from local network (phone)
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+    },
+  },
 })
