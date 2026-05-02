@@ -52,23 +52,37 @@ glassesPlane.position.z = 0.2 // Adjusted Z-position to sit safely in front of t
 faceGroup.add(glassesPlane)
 
 // Load 3D Model Function
-function load3DModel(path) {
-  // Hide plane if we load a real model
+function load3DModel(path, texturePath = null) {
   glassesPlane.visible = false
   if (current3DModel) faceGroup.remove(current3DModel)
 
   gltfLoader.load(path, (gltf) => {
     current3DModel = gltf.scene
     
-    // Auto-center and scale
+    // Apply Texture if provided
+    if (texturePath) {
+      const newTex = textureLoader.load(texturePath)
+      newTex.flipY = false // GLTF usually needs flipped Y
+      
+      current3DModel.traverse((node) => {
+        if (node.isMesh) {
+          node.material = new THREE.MeshStandardMaterial({
+            map: newTex,
+            transparent: true,
+            roughness: 0.2,
+            metalness: 0.5
+          })
+        }
+      })
+    }
+
     const box = new THREE.Box3().setFromObject(current3DModel)
     const size = box.getSize(new THREE.Vector3())
     const center = box.getCenter(new THREE.Vector3())
     
-    current3DModel.position.sub(center) // Center the model
-    current3DModel.position.z = -0.4     // Much deeper default seating
+    current3DModel.position.sub(center)
+    current3DModel.position.z = -0.4
     
-    // Normalize size (assuming 1.8 units is a good width)
     const scale = 1.8 / size.x
     current3DModel.scale.set(scale, scale, scale)
     
@@ -76,8 +90,8 @@ function load3DModel(path) {
   })
 }
 
-// Initial Load
-load3DModel('/Glasses.glb')
+// Initial Load with image.png texture
+load3DModel('/Glasses.glb', '/image.png')
 
 // --- RENDER UI ---
 uiOverlay.innerHTML = `
