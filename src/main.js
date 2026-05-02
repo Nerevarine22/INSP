@@ -62,15 +62,20 @@ function load3DModel(path, texturePath = null) {
     // Apply Texture if provided
     if (texturePath) {
       const newTex = textureLoader.load(texturePath)
-      newTex.flipY = false // GLTF usually needs flipped Y
+      newTex.flipY = false
       
       current3DModel.traverse((node) => {
         if (node.isMesh) {
+          const isLens = node.name.toLowerCase().includes('lens') || node.name.toLowerCase().includes('glass')
+          
           node.material = new THREE.MeshStandardMaterial({
             map: newTex,
-            transparent: true,
-            roughness: 0.2,
-            metalness: 0.5
+            transparent: isLens, // Only lenses stay transparent by default
+            opacity: isLens ? 0.6 : 1.0,
+            alphaTest: 0.1,
+            side: THREE.DoubleSide,
+            roughness: 0.3,
+            metalness: 0.2
           })
         }
       })
