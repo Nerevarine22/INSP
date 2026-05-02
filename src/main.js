@@ -627,17 +627,17 @@ function drawGlasses(ctx, landmarks, matrix, w, h) {
   const anchorY = smoothedPos.y - yOffset
 
   // ─── Draw Temples (Arms) with Perspective ───
-  const p1 = {
+  const pAnat1 = {
     x: (flipX ? (1 - landmarks[127].x) : landmarks[127].x) * w,
     y: landmarks[127].y * h
   }
-  const p2 = {
+  const pAnat2 = {
     x: (flipX ? (1 - landmarks[389].x) : landmarks[389].x) * w,
     y: landmarks[389].y * h
   }
 
-  const pScreenL = p1.x < p2.x ? p1 : p2
-  const pScreenR = p1.x < p2.x ? p2 : p1
+  const pScreenL = pAnat1.x < pAnat2.x ? pAnat1 : pAnat2
+  const pScreenR = pAnat1.x < pAnat2.x ? pAnat2 : pAnat1
 
   const drawTemple = (startX, startY, endX, endY, isVisible) => {
     if (!isVisible) return;
