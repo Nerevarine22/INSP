@@ -142,16 +142,6 @@ let animationId = null
 let lastVideoTime = -1
 let currentFacingMode = 'user'
 
-// Frame Gallery Logic
-document.querySelectorAll('.frame-item').forEach(item => {
-  item.addEventListener('click', () => {
-    document.querySelectorAll('.frame-item').forEach(f => f.classList.remove('active'));
-    item.classList.add('active');
-    const newSrc = item.getAttribute('data-src');
-    glassesImg.src = newSrc;
-  });
-});
-
 // Calibration State
 let currentMetrics = null;
 let savedSamplesCount = 0;
@@ -203,7 +193,17 @@ function getMedian(arr) {
 }
 
 const glassesImg = new Image()
-glassesImg.src = '/pngwing.com.png'
+glassesImg.src = '/glasses.svg'
+
+// Frame Selection Logic
+document.querySelectorAll('.frame-item').forEach(item => {
+  item.addEventListener('click', () => {
+    document.querySelectorAll('.frame-item').forEach(f => f.classList.remove('active'));
+    item.classList.add('active');
+    const newSrc = item.getAttribute('data-src');
+    glassesImg.src = newSrc;
+  });
+});
 
 // EMA Smoothing state
 let smoothedPos = { x: 0, y: 0, w: 0, roll: 0, pitch: 0, yaw: 0 }
