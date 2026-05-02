@@ -260,7 +260,7 @@ async function startExperience() {
     showLoading('Loading Wasm…', 40)
     // Create fileset resolver (using CDN for wasm files to keep bundle size small)
     const vision = await FilesetResolver.forVisionTasks(
-      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm'
+      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.20/wasm'
     )
     
     showLoading('Loading neural net…', 70)
