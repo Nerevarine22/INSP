@@ -1,5 +1,4 @@
 import './style.css'
-import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision'
 
 const app = document.querySelector('#app')
 
@@ -20,20 +19,19 @@ app.innerHTML = `
               Start camera
             </button>
             <button id="flipCameraButton" class="secondary-button" style="font-size: 1.2rem; padding: 0.5rem 1rem;" type="button" aria-label="Flip Camera" hidden>
-              🔄
+              ­ƒöä
             </button>
           </div>
         </div>
 
         <div class="overlay bottom-overlay">
-          <!-- AI Stylist Card (Restored) -->
           <div class="recommendation-card" id="recommendationCard" hidden>
             <div class="rec-header">
               <span class="metric-label">Smart Stylist: <strong id="faceShapeCategory" style="color: var(--accent);">Analyzing...</strong></span>
             </div>
             <div class="rec-body" id="recBody" hidden>
               <p class="rec-advice" id="faceShapeAdvice"></p>
-              <p class="rec-models"><strong>Моделі:</strong> <span id="faceShapeModels"></span></p>
+              <p class="rec-models"><strong>ð£ð¥ð┤ðÁð╗Ðû:</strong> <span id="faceShapeModels"></span></p>
             </div>
           </div>
           
@@ -46,12 +44,30 @@ app.innerHTML = `
                 <button class="cal-btn" data-shape="Rounded">Rounded</button>
                 <button class="cal-btn" data-shape="Oval">Oval</button>
              </div>
-             <p class="calibration-status" id="calStatus">Ready for capture</p>
+             <p class="calibration-status" id="calStatus">No samples yet</p>
+          </div>
+
+          <!-- Metrics (hidden but needed for stability) -->
+          <div class="metrics-row" style="display: none;">
+            <div class="metric-card">
+              <span class="metric-label">Tracking</span>
+              <strong id="trackingValue">Waiting</strong>
+            </div>
+            <div class="metric-card">
+              <span class="metric-label">Rotation</span>
+              <strong id="rotationValue">0 deg, 0 deg, 0 deg</strong>
+            </div>
           </div>
 
           <div class="bottom-actions">
-            <button id="toggleModeButton" class="primary-button" style="flex: 2;">Switch to Calibration</button>
-            <a href="#stats" id="statsLink" class="secondary-button" style="flex: 1;">Stats</a>
+            <div class="toggle-group">
+              <label class="switch-label">
+                <input type="checkbox" id="autoDetectToggle" checked>
+                <span class="switch-text">Auto AI</span>
+              </label>
+            </div>
+            <button id="toggleCalButton" class="secondary-button">Calibration</button>
+            <a href="#stats" id="statsLink" class="secondary-button">Stats</a>
           </div>
         </div>
 
@@ -61,7 +77,7 @@ app.innerHTML = `
           <div class="loading-bar-wrap">
             <div class="loading-bar" id="loadingBar"></div>
           </div>
-          <p id="loadingLabel" class="loading-label">Loading…</p>
+          <p id="loadingLabel" class="loading-label">LoadingÔÇª</p>
         </div>
       </div>
     </section>
@@ -112,8 +128,6 @@ const faceShapeCategory  = document.querySelector('#faceShapeCategory')
 const recBody            = document.querySelector('#recBody')
 const faceShapeAdvice    = document.querySelector('#faceShapeAdvice')
 const faceShapeModels    = document.querySelector('#faceShapeModels')
-const toggleModeButton   = document.querySelector('#toggleModeButton')
-const calStatus          = document.querySelector('#calStatus')
 
 let isInitializing = false
 let isTracking = false
@@ -130,10 +144,11 @@ let savedSamplesCount = 0;
 let shapeDetectTimeout = null
 let currentCategoryStr = null
 let currentShapeKey = null
+let isAutoDetectionEnabled = true
 const faceMetricsBuffer = []
 const MAX_METRICS_BUFFER = 15
 
-// ─── Constants & State ───────────────────────────────────────────────────────
+// ÔöÇÔöÇÔöÇ Constants & State ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
 // Face Shape Points:
 // 8: Between eyebrows
 // 2: Base of nose
@@ -187,7 +202,7 @@ yOffsetSlider.addEventListener('input', (e) => {
   userYOffsetRatio = -(parseInt(e.target.value, 10) / 400)
 })
 
-// ─── UI Helpers ────────────────────────────────────────────────────────────
+// ÔöÇÔöÇÔöÇ UI Helpers ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
 function setStatus(message, tone = 'idle') {
   statusText.textContent = message
   document.documentElement.dataset.status = tone
@@ -213,7 +228,7 @@ function setRotation(rx, ry, rz) {
   rotationValue.textContent = `${toDegrees(rx)}, ${toDegrees(ry)}, ${toDegrees(rz)}`
 }
 
-// ─── Math Helpers ──────────────────────────────────────────────────────────
+// ÔöÇÔöÇÔöÇ Math Helpers ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
 function lerp(start, end, amt) {
   return (1 - amt) * start + amt * end
 }
@@ -250,20 +265,21 @@ async function startExperience() {
   if (isInitializing) return
   isInitializing = true
   startButton.disabled = true
-  setStatus('Loading AI model…', 'warning')
+  setStatus('Loading AI model...', 'warning')
   setTrackingState('Loading')
-  showLoading('Initializing neural net…', 20)
+  showLoading('Fetching MediaPipe...', 10)
 
   try {
-    // MediaPipe components are now imported at the top-level
+    // Lazy load MediaPipe Tasks Vision
+    const { FaceLandmarker, FilesetResolver } = await import('@mediapipe/tasks-vision')
     
-    showLoading('Loading Wasm…', 40)
+    showLoading('Loading Wasm...', 40)
     // Create fileset resolver (using CDN for wasm files to keep bundle size small)
     const vision = await FilesetResolver.forVisionTasks(
-      'https://unpkg.com/@mediapipe/tasks-vision@0.10.14/wasm'
+      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm'
     )
     
-    showLoading('Loading neural net…', 70)
+    showLoading('Loading neural net...', 70)
     faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
       baseOptions: {
         modelAssetPath: '/mediapipe/face_landmarker.task',
@@ -285,8 +301,8 @@ async function startExperience() {
     return
   }
 
-  showLoading('Starting camera…', 90)
-  setStatus('Requesting camera access…', 'warning')
+  showLoading('Starting camera...', 90)
+  setStatus('Requesting camera access...', 'warning')
 
   try {
     await startCameraStream(currentFacingMode)
@@ -317,10 +333,12 @@ async function startExperience() {
 
 startButton.addEventListener('click', startExperience)
 
-// ─── Calibration & Routing Logic ──────────────────────────────────────────
+// ÔöÇÔöÇÔöÇ Calibration & Routing Logic ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
 const mainViewer = document.querySelector('#mainViewer');
 const statsPanel = document.querySelector('#statsPanel');
 const calibrationPanel = document.querySelector('#calibrationPanel');
+const toggleCalButton = document.querySelector('#toggleCalButton');
+const calStatus = document.querySelector('#calStatus');
 const statsTableBody = document.querySelector('#statsTable tbody');
 
 function syncRoute() {
@@ -337,20 +355,21 @@ function syncRoute() {
 window.addEventListener('hashchange', syncRoute);
 syncRoute();
 
-let currentAppMode = 'stylist'; // 'stylist' or 'calibration'
+const autoDetectToggle = document.querySelector('#autoDetectToggle');
 
-toggleModeButton.addEventListener('click', () => {
-  if (currentAppMode === 'stylist') {
-    currentAppMode = 'calibration';
-    toggleModeButton.textContent = 'Switch to Stylist';
+autoDetectToggle.addEventListener('change', (e) => {
+  isAutoDetectionEnabled = e.target.checked;
+  if (!isAutoDetectionEnabled) {
     recommendationCard.hidden = true;
-    calibrationPanel.hidden = false;
+    calibrationPanel.hidden = false; // Show buttons automatically in manual mode
+    currentCategoryStr = null;
   } else {
-    currentAppMode = 'stylist';
-    toggleModeButton.textContent = 'Switch to Calibration';
-    recommendationCard.hidden = false;
-    calibrationPanel.hidden = true;
+    calibrationPanel.hidden = true; // Hide buttons when AI is back on
   }
+});
+
+toggleCalButton.addEventListener('click', () => {
+  calibrationPanel.hidden = !calibrationPanel.hidden;
 });
 
 document.querySelector('#backToApp').addEventListener('click', () => { window.location.hash = ''; });
@@ -383,18 +402,16 @@ document.querySelectorAll('.cal-btn').forEach(btn => {
         body: JSON.stringify(data)
       });
       const result = await res.json();
-      calStatus.style.color = 'var(--success)';
-      calStatus.textContent = `✅ Saved as ${label}! (Total: ${savedSamplesCount})`;
+      savedSamplesCount = result.count;
+      calStatus.textContent = `Saved! Total samples: ${savedSamplesCount}`;
       btn.style.background = 'var(--success)';
       setTimeout(() => { 
         btn.style.background = '';
         btn.disabled = false;
-        calStatus.textContent = `Ready for next capture`;
-      }, 1500);
+      }, 500);
     } catch (e) {
       console.error(e);
-      calStatus.style.color = 'var(--error)';
-      calStatus.textContent = "❌ Save failed!";
+      alert("Failed to save to server. Make sure you are running 'npm run dev' on PC.");
       btn.disabled = false;
     }
   });
@@ -410,7 +427,7 @@ async function loadStats() {
       <tr>
         <td>${s.id.toString().slice(-6)}</td>
         <td><strong>${s.label}</strong></td>
-        <td>${s.metrics.angle.toFixed(2)}°</td>
+        <td>${s.metrics.angle.toFixed(2)}┬░</td>
         <td>${s.metrics.h.toFixed(2)}</td>
         <td>${s.metrics.j.toFixed(2)}</td>
         <td>${s.metrics.w.toFixed(2)}</td>
@@ -460,7 +477,7 @@ flipCameraButton.addEventListener('click', async () => {
   animationId = requestAnimationFrame(renderLoop)
 })
 
-// ─── Render Loop ──────────────────────────────────────────────────────────
+// ÔöÇÔöÇÔöÇ Render Loop ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
 function renderLoop() {
   if (!isTracking) return
   
@@ -497,19 +514,18 @@ function renderLoop() {
       
       drawGlasses(ctx, landmarks, matrix, canvas.width, canvas.height)
     } else {
+      recommendationCard.hidden = true;
+      recBody.hidden = true;
+      faceShapeCategory.textContent = 'Analyzing...';
       currentCategoryStr = null;
-      currentMetrics = null; 
       faceMetricsBuffer.length = 0;
       uBuffer.length = 0;
       if (shapeDetectTimeout) clearTimeout(shapeDetectTimeout);
-
-      if (currentAppMode === 'calibration') {
-        calStatus.style.color = 'var(--warning)';
-        calStatus.textContent = "⚠️ Position face in frame...";
-      } else {
-        recommendationCard.hidden = true;
-      }
     }
+  } else {
+    // If we didn't process a new video frame, we still draw the last smoothed position to prevent flicker.
+    // However, the video isn't redrawn. Actually, we should redraw the last frame here too.
+    // The previous drawImage handles this automatically since video content hasn't changed.
   }
 
   animationId = requestAnimationFrame(renderLoop)
@@ -654,7 +670,15 @@ function drawGlasses(ctx, landmarks, matrix, w, h) {
     const angleR = getAngle(p361, p454, p152)
     const jawAngle = (angleL + angleR) / 2
 
-    // Step 3: Collect Metrics
+    // Step 3: Classification (Only if Auto Detection is enabled)
+    if (!isAutoDetectionEnabled) {
+       recommendationCard.hidden = true;
+       return;
+    }
+
+    console.log(`--- Metrics: Angle=${jawAngle.toFixed(2)}, H=${heightUnits.toFixed(2)}, J=${jawUnits.toFixed(2)}, W=${widthUnits.toFixed(2)} ---`)
+    
+    // Store for calibration
     currentMetrics = {
       angle: jawAngle,
       h: heightUnits,
@@ -662,80 +686,88 @@ function drawGlasses(ctx, landmarks, matrix, w, h) {
       w: widthUnits
     };
 
-    // Live Metrics for Calibration Mode
-    if (currentAppMode === 'calibration') {
-      calStatus.style.color = 'var(--accent)';
-      calStatus.textContent = `Live: Angle ${jawAngle.toFixed(0)}° | H/W ${(heightUnits/widthUnits).toFixed(2)}`;
-      return; // Skip classification UI in calibration mode
-    }
-
-    // Step 4: Classification Logic (NEW RATIO-BASED)
-    const hwRatio = heightUnits / widthUnits;
-    const jwRatio = jawUnits / widthUnits;
-    let bestShape = 'Oval';
-
-    // 1. Elongated (Based on H/W Ratio > 1.23)
-    if (hwRatio > 1.23) {
-      bestShape = 'Elongated';
+    let bestShape = 'Oval'
+    
+    // 1. Elongated (Long face)
+    if (heightUnits > 3.3) {
+      bestShape = 'Elongated'
     } 
-    // 2. Angular (Sharp Angle < 137°)
-    else if (jawAngle < 137) {
-      bestShape = 'Angular';
+    // 2. Angular Dominance (Jaw is wider than cheekbones)
+    else if (jawUnits >= widthUnits * 1.02) {
+      console.log('Angular trigger: Jaw Dominance')
+      bestShape = 'Angular'
     }
-    // 3. Rounded (Wide face W > 2.65)
-    else if (widthUnits > 2.65 && jawAngle > 138) {
-      bestShape = 'Rounded';
+    // 3. Angular (Sharp Jaw)
+    else if (jawAngle < 138) {
+      console.log('Angular trigger: Sharp Jaw')
+      bestShape = 'Angular'
     }
-    // 4. Oval (Balanced)
+    // 4. Rounded (Wide face + smooth jaw line)
+    else if (jawAngle > 146 && widthUnits > 2.6) {
+      bestShape = 'Rounded'
+    }
+    // 5. Oval (The calibrated window)
+    else if (heightUnits >= 2.6 && heightUnits <= 3.2 && jawAngle >= 138 && jawAngle <= 148) {
+      bestShape = 'Oval'
+    } 
     else {
-      bestShape = 'Oval';
+      // Fallback
+      bestShape = heightUnits < 2.6 ? 'Rounded' : 'Oval'
     }
 
-    // Buffering & UI Updates
-    if (faceMetricsBuffer.length >= MAX_METRICS_BUFFER) faceMetricsBuffer.shift();
-    faceMetricsBuffer.push(bestShape);
+    // Add to buffer for stabilization of the classification
+    if (faceMetricsBuffer.length >= MAX_METRICS_BUFFER) faceMetricsBuffer.shift()
+    faceMetricsBuffer.push(bestShape)
 
-    const counts = faceMetricsBuffer.reduce((acc, shape) => { acc[shape] = (acc[shape] || 0) + 1; return acc; }, {});
-    currentShapeKey = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
+    // Determine the most frequent shape in buffer
+    const counts = faceMetricsBuffer.reduce((acc, shape) => {
+      acc[shape] = (acc[shape] || 0) + 1
+      return acc
+    }, {})
+    
+    currentShapeKey = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b)
 
-    let category, advice, recommendedModels = [];
+    let category, advice
+    let recommendedModels = []
 
     if (currentShapeKey === 'Elongated') {
-      category = 'Elongated (Подовжене)';
-      advice = 'Обличчя витягнуте: обирайте великі оправи, щоб візуально вкоротити обличчя.';
-      recommendedModels = ['Aviator', 'Oversized', 'Wayfarer'];
+      category = 'Elongated (ðƒð¥ð┤ð¥ð▓ðÂðÁð¢ðÁ)'
+      advice = 'ð×ð▒ð╗ð©ÐçÐçÐÅ ð▓ð©ÐéÐÅð│ð¢ÐâÐéðÁ: ð¥ð▒ð©ÐÇð░ð╣ÐéðÁ ð▓ð©ð║ð╗ÐÄÐçð¢ð¥ ð▓ðÁð╗ð©ð║Ðû ð¥ð┐ÐÇð░ð▓ð© (Oversized, ðÉð▓Ðûð░Ðéð¥ÐÇð©).'
+      recommendedModels = ['Aviator (ðÉð▓Ðûð░Ðéð¥ÐÇð©)', 'Oversized', 'Wayfarer']
     } else if (currentShapeKey === 'Angular') {
-      category = 'Angular (Квадратне/Гостре)';
-      advice = 'Виражені кути: пом\'якшуйте їх за допомогою круглих або овальних оправ.';
-      recommendedModels = ['Round', 'Oval', 'Panto'];
+      category = 'Angular (ðÜð▓ð░ð┤ÐÇð░Ðéð¢ðÁ/ðôð¥ÐüÐéÐÇðÁ)'
+      advice = 'ðÆð©ÐÇð░ðÂðÁð¢Ðû ð║ÐâÐéð© ÐëðÁð╗ðÁð┐ð©: ð┐ð¥ð╝\'ÐÅð║ÐêÐâð╣ÐéðÁ ð╗Ðûð¢ÐûÐÄ ð¥ð▒ð╗ð©ÐçÐçÐÅ ð║ð¥ð╗ð¥/ð¥ð▓ð░ð╗ð¥ð╝.'
+      recommendedModels = ['Round (ðÜÐÇÐâð│ð╗Ðû)', 'Oval (ð×ð▓ð░ð╗Ðîð¢Ðû)', 'Panto']
     } else if (currentShapeKey === 'Rounded') {
-      category = 'Rounded (Кругле)';
-      advice = 'Плавні лінії: додайте характеру за допомогою прямокутних оправ.';
-      recommendedModels = ['Square', 'Rectangular', 'Cat-eye'];
+      category = 'Rounded (ðÜÐÇÐâð│ð╗ðÁ/ðíðÁÐÇÐåðÁ)'
+      advice = 'ðƒð╗ð░ð▓ð¢Ðû ð╗Ðûð¢ÐûÐù ð¥ð▒ð╗ð©ÐçÐçÐÅ: ð┤ð¥ð┤ð░ð╣ÐéðÁ ð║ÐâÐéÐûð▓ ðÀð░ ð┤ð¥ð┐ð¥ð╝ð¥ð│ð¥ÐÄ ð┐ÐÇÐÅð╝ð¥ð║ÐâÐéð¢ð©Ðà ð¥ð┐ÐÇð░ð▓.'
+      recommendedModels = ['Square (ðÜð▓ð░ð┤ÐÇð░Ðéð¢Ðû)', 'Rectangular (ðƒÐÇÐÅð╝ð¥ð║ÐâÐéð¢Ðû)', 'Cat-eye (ðÜð¥ÐéÐÅÐçðÁ ð¥ð║ð¥)']
     } else {
-      category = 'Oval (Овальне)';
-      advice = 'Ідеальний баланс: вам підійде майже будь-яка форма!';
-      recommendedModels = ['Aviator', 'Wayfarer', 'Cat-eye', 'Round'];
+      category = 'Oval (ðúð¢Ðûð▓ðÁÐÇÐüð░ð╗Ðîð¢ðÁ/ðòÐéð░ð╗ð¥ð¢)'
+      advice = 'ðåð┤ðÁð░ð╗Ðîð¢Ðû ð┐ÐÇð¥ð┐ð¥ÐÇÐåÐûÐù: ð▓ð░ð╝ ð┐Ðûð┤Ðûð╣ð┤ðÁ ð▒Ðûð╗ÐîÐêÐûÐüÐéÐî ð¥ð┐ÐÇð░ð▓. ðòð║Ðüð┐ðÁÐÇð©ð╝ðÁð¢ÐéÐâð╣ÐéðÁ ðÀ Ðäð¥ÐÇð╝ð░ð╝ð©!'
+      recommendedModels = ['Aviator (ðÉð▓Ðûð░Ðéð¥ÐÇð©)', 'Wayfarer', 'Cat-eye (ðÜð¥ÐéÐÅÐçðÁ ð¥ð║ð¥)', 'Round (ðÜÐÇÐâð│ð╗Ðû)']
     }
+
+    let models = recommendedModels.join(', ')
 
     if (category !== currentCategoryStr) {
-      currentCategoryStr = category;
-      faceShapeCategory.textContent = 'Analyzing...';
-      recBody.hidden = true;
-      if (shapeDetectTimeout) clearTimeout(shapeDetectTimeout);
+      currentCategoryStr = category
+      faceShapeCategory.textContent = 'Analyzing...'
+      recBody.hidden = true
+      
+      if (shapeDetectTimeout) clearTimeout(shapeDetectTimeout)
+      
       shapeDetectTimeout = setTimeout(() => {
-        faceShapeCategory.textContent = category;
-        faceShapeAdvice.textContent = advice;
-        faceShapeModels.textContent = recommendedModels.join(', ');
-        recBody.hidden = false;
-        recommendationCard.hidden = false;
-      }, 1500);
+        faceShapeCategory.textContent = category
+        faceShapeAdvice.textContent = advice
+        faceShapeModels.textContent = models
+        recBody.hidden = false
+      }, 2000)
     }
   }
-}
 
-function getEMA(current, previous, alpha) {
-  return lerp(previous, current, alpha)
-}
 
-startButton.addEventListener('click', startExperience)
+
+  recommendationCard.hidden = false
+  recommendationCard.style.boxShadow = '0 0 0 2px var(--success), 0 14px 30px rgba(125, 227, 161, 0.15)'
+}
