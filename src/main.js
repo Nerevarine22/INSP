@@ -211,21 +211,17 @@ function loop() {
 function update3D(landmarks, matrix) {
   faceGroup.visible = true
   
-  // Landmark 6: Nose Bridge (Center of glasses)
   const p6 = landmarks[6]
-  
-  // Convert normalized [0, 1] to Three.js space [-aspect, aspect]
   const aspect = window.innerWidth / window.innerHeight
-  // Viewport size at z=0 for FOV 45 and camera.z=5 is ~4.14
   const vH = 2 * Math.tan((45 * Math.PI / 180) / 2) * 5
   const vW = vH * aspect
 
   // Position
-  const tx = (0.5 - p6.x) * vW  // Inverted X for mirror
+  const tx = (0.5 - p6.x) * vW
   const ty = (0.5 - p6.y) * vH
   faceGroup.position.set(tx, ty, 0)
 
-  // Rotation from matrix or landmarks
+  // Rotation
   if (matrix) {
     const m = new THREE.Matrix4().fromArray(matrix.data)
     const pos = new THREE.Vector3(), quat = new THREE.Quaternion(), scl = new THREE.Vector3()
@@ -233,13 +229,12 @@ function update3D(landmarks, matrix) {
     faceGroup.quaternion.copy(quat)
   }
 
-  // Scale: Distance between eye corners (33 and 263)
+  // Scale: Distance between eye corners
   const p33 = landmarks[33]
   const p263 = landmarks[263]
   const eyeDist = Math.sqrt(Math.pow(p33.x - p263.x, 2) + Math.pow(p33.y - p263.y, 2))
   
-  // A standard face width is ~0.4 normalized units. 
-  // We scale the model (which we normalized to 1.8 units) to fit the eye distance.
-  const s = eyeDist * 8.5 // Fine-tuned multiplier for 3D units
+  // Adjusted multiplier from 8.5 to ~2.8 to fit the face
+  const s = eyeDist * 3.1 
   faceGroup.scale.set(s, s, s)
 }
