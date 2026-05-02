@@ -3,7 +3,8 @@ import * as THREE from 'three'
 
 // --- THREE.JS SETUP ---
 const scene = new THREE.Scene()
-const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000)
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 2000)
+camera.position.z = 5 // Position camera back
 const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true })
 renderer.setClearColor(0x000000, 0) // Fully transparent
 renderer.setSize(window.innerWidth, window.innerHeight)
@@ -12,7 +13,7 @@ document.querySelector('#app').appendChild(renderer.domElement)
 renderer.domElement.style.position = 'fixed'
 renderer.domElement.style.top = '0'
 renderer.domElement.style.left = '0'
-renderer.domElement.style.zIndex = '5'
+renderer.domElement.style.zIndex = '10' // On top of video
 renderer.domElement.style.pointerEvents = 'none'
 
 // Lights
@@ -194,12 +195,9 @@ function update3D(landmarks, matrix) {
     const scale = new THREE.Vector3()
     m.decompose(position, quaternion, scale)
     
-    // Invert X for mirrored view
-    position.x = -position.x / 10 
-    position.y = -position.y / 10
-    position.z = -position.z / 10
-    
-    faceGroup.position.copy(position)
+    // MediaPipe matrix is in cm/mm, we need to map to Three.js units
+    // Typically, for a 45deg FOV camera at z=5, a face is roughly at z=0 to z=-2
+    faceGroup.position.set(-position.x / 10, -position.y / 10, -position.z / 50)
     faceGroup.quaternion.copy(quaternion)
   }
 
@@ -207,8 +205,11 @@ function update3D(landmarks, matrix) {
   const p8 = landmarks[8]
   const p2 = landmarks[2]
   const u = Math.sqrt(Math.pow(p8.x - p2.x, 2) + Math.pow(p8.y - p2.y, 2))
-  currentU = u * 10 // scale factor
-  faceGroup.scale.set(currentU, currentU, currentU)
+  
+  // u is typically 0.05 - 0.15 normalized.
+  // We want the group scale to be around 5.0 - 15.0
+  const finalScale = u * 100 
+  faceGroup.scale.set(finalScale, finalScale, finalScale)
 }
 
 // Reuse scoring logic from previous version...
