@@ -19,7 +19,7 @@ app.innerHTML = `
               Start camera
             </button>
             <button id="flipCameraButton" class="secondary-button" style="font-size: 1.2rem; padding: 0.5rem 1rem;" type="button" aria-label="Flip Camera" hidden>
-              ­ƒöä
+              🔄
             </button>
           </div>
         </div>
@@ -31,7 +31,7 @@ app.innerHTML = `
             </div>
             <div class="rec-body" id="recBody" hidden>
               <p class="rec-advice" id="faceShapeAdvice"></p>
-              <p class="rec-models"><strong>ð£ð¥ð┤ðÁð╗Ðû:</strong> <span id="faceShapeModels"></span></p>
+              <p class="rec-models"><strong>Моделі:</strong> <span id="faceShapeModels"></span></p>
             </div>
           </div>
           
@@ -77,7 +77,7 @@ app.innerHTML = `
           <div class="loading-bar-wrap">
             <div class="loading-bar" id="loadingBar"></div>
           </div>
-          <p id="loadingLabel" class="loading-label">LoadingÔÇª</p>
+          <p id="loadingLabel" class="loading-label">Loading…</p>
         </div>
       </div>
     </section>
@@ -148,7 +148,7 @@ let isAutoDetectionEnabled = true
 const faceMetricsBuffer = []
 const MAX_METRICS_BUFFER = 15
 
-// ÔöÇÔöÇÔöÇ Constants & State ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+// ─── Constants & State ───────────────────────────────────────────────────────
 // Face Shape Points:
 // 8: Between eyebrows
 // 2: Base of nose
@@ -202,7 +202,7 @@ yOffsetSlider.addEventListener('input', (e) => {
   userYOffsetRatio = -(parseInt(e.target.value, 10) / 400)
 })
 
-// ÔöÇÔöÇÔöÇ UI Helpers ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+// ─── UI Helpers ────────────────────────────────────────────────────────────
 function setStatus(message, tone = 'idle') {
   statusText.textContent = message
   document.documentElement.dataset.status = tone
@@ -228,7 +228,7 @@ function setRotation(rx, ry, rz) {
   rotationValue.textContent = `${toDegrees(rx)}, ${toDegrees(ry)}, ${toDegrees(rz)}`
 }
 
-// ÔöÇÔöÇÔöÇ Math Helpers ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+// ─── Math Helpers ──────────────────────────────────────────────────────────
 function lerp(start, end, amt) {
   return (1 - amt) * start + amt * end
 }
@@ -333,7 +333,7 @@ async function startExperience() {
 
 startButton.addEventListener('click', startExperience)
 
-// ÔöÇÔöÇÔöÇ Calibration & Routing Logic ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+// ─── Calibration & Routing Logic ──────────────────────────────────────────
 const mainViewer = document.querySelector('#mainViewer');
 const statsPanel = document.querySelector('#statsPanel');
 const calibrationPanel = document.querySelector('#calibrationPanel');
@@ -427,7 +427,7 @@ async function loadStats() {
       <tr>
         <td>${s.id.toString().slice(-6)}</td>
         <td><strong>${s.label}</strong></td>
-        <td>${s.metrics.angle.toFixed(2)}┬░</td>
+        <td>${s.metrics.angle.toFixed(2)}°</td>
         <td>${s.metrics.h.toFixed(2)}</td>
         <td>${s.metrics.j.toFixed(2)}</td>
         <td>${s.metrics.w.toFixed(2)}</td>
@@ -477,7 +477,7 @@ flipCameraButton.addEventListener('click', async () => {
   animationId = requestAnimationFrame(renderLoop)
 })
 
-// ÔöÇÔöÇÔöÇ Render Loop ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+// ─── Render Loop ──────────────────────────────────────────────────────────
 function renderLoop() {
   if (!isTracking) return
   
@@ -731,21 +731,21 @@ function drawGlasses(ctx, landmarks, matrix, w, h) {
     let recommendedModels = []
 
     if (currentShapeKey === 'Elongated') {
-      category = 'Elongated (ðƒð¥ð┤ð¥ð▓ðÂðÁð¢ðÁ)'
-      advice = 'ð×ð▒ð╗ð©ÐçÐçÐÅ ð▓ð©ÐéÐÅð│ð¢ÐâÐéðÁ: ð¥ð▒ð©ÐÇð░ð╣ÐéðÁ ð▓ð©ð║ð╗ÐÄÐçð¢ð¥ ð▓ðÁð╗ð©ð║Ðû ð¥ð┐ÐÇð░ð▓ð© (Oversized, ðÉð▓Ðûð░Ðéð¥ÐÇð©).'
-      recommendedModels = ['Aviator (ðÉð▓Ðûð░Ðéð¥ÐÇð©)', 'Oversized', 'Wayfarer']
+      category = 'Elongated (Подовжене)'
+      advice = 'Обличчя витягнуте: обирайте виключно великі оправи (Oversized, Авіатори).'
+      recommendedModels = ['Aviator (Авіатори)', 'Oversized', 'Wayfarer']
     } else if (currentShapeKey === 'Angular') {
-      category = 'Angular (ðÜð▓ð░ð┤ÐÇð░Ðéð¢ðÁ/ðôð¥ÐüÐéÐÇðÁ)'
-      advice = 'ðÆð©ÐÇð░ðÂðÁð¢Ðû ð║ÐâÐéð© ÐëðÁð╗ðÁð┐ð©: ð┐ð¥ð╝\'ÐÅð║ÐêÐâð╣ÐéðÁ ð╗Ðûð¢ÐûÐÄ ð¥ð▒ð╗ð©ÐçÐçÐÅ ð║ð¥ð╗ð¥/ð¥ð▓ð░ð╗ð¥ð╝.'
-      recommendedModels = ['Round (ðÜÐÇÐâð│ð╗Ðû)', 'Oval (ð×ð▓ð░ð╗Ðîð¢Ðû)', 'Panto']
+      category = 'Angular (Квадратне/Гостре)'
+      advice = 'Виражені кути щелепи: пом\'якшуйте лінію обличчя коло/овалом.'
+      recommendedModels = ['Round (Круглі)', 'Oval (Овальні)', 'Panto']
     } else if (currentShapeKey === 'Rounded') {
-      category = 'Rounded (ðÜÐÇÐâð│ð╗ðÁ/ðíðÁÐÇÐåðÁ)'
-      advice = 'ðƒð╗ð░ð▓ð¢Ðû ð╗Ðûð¢ÐûÐù ð¥ð▒ð╗ð©ÐçÐçÐÅ: ð┤ð¥ð┤ð░ð╣ÐéðÁ ð║ÐâÐéÐûð▓ ðÀð░ ð┤ð¥ð┐ð¥ð╝ð¥ð│ð¥ÐÄ ð┐ÐÇÐÅð╝ð¥ð║ÐâÐéð¢ð©Ðà ð¥ð┐ÐÇð░ð▓.'
-      recommendedModels = ['Square (ðÜð▓ð░ð┤ÐÇð░Ðéð¢Ðû)', 'Rectangular (ðƒÐÇÐÅð╝ð¥ð║ÐâÐéð¢Ðû)', 'Cat-eye (ðÜð¥ÐéÐÅÐçðÁ ð¥ð║ð¥)']
+      category = 'Rounded (Кругле/Серце)'
+      advice = 'Плавні лінії обличчя: додайте кутів за допомогою прямокутних оправ.'
+      recommendedModels = ['Square (Квадратні)', 'Rectangular (Прямокутні)', 'Cat-eye (Котяче око)']
     } else {
-      category = 'Oval (ðúð¢Ðûð▓ðÁÐÇÐüð░ð╗Ðîð¢ðÁ/ðòÐéð░ð╗ð¥ð¢)'
-      advice = 'ðåð┤ðÁð░ð╗Ðîð¢Ðû ð┐ÐÇð¥ð┐ð¥ÐÇÐåÐûÐù: ð▓ð░ð╝ ð┐Ðûð┤Ðûð╣ð┤ðÁ ð▒Ðûð╗ÐîÐêÐûÐüÐéÐî ð¥ð┐ÐÇð░ð▓. ðòð║Ðüð┐ðÁÐÇð©ð╝ðÁð¢ÐéÐâð╣ÐéðÁ ðÀ Ðäð¥ÐÇð╝ð░ð╝ð©!'
-      recommendedModels = ['Aviator (ðÉð▓Ðûð░Ðéð¥ÐÇð©)', 'Wayfarer', 'Cat-eye (ðÜð¥ÐéÐÅÐçðÁ ð¥ð║ð¥)', 'Round (ðÜÐÇÐâð│ð╗Ðû)']
+      category = 'Oval (Універсальне/Еталон)'
+      advice = 'Ідеальні пропорції: вам підійде більшість оправ. Експериментуйте з формами!'
+      recommendedModels = ['Aviator (Авіатори)', 'Wayfarer', 'Cat-eye (Котяче око)', 'Round (Круглі)']
     }
 
     let models = recommendedModels.join(', ')
