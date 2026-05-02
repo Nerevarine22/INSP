@@ -498,35 +498,31 @@ function drawGlasses(ctx, landmarks, matrix, w, h) {
     
     let bestShape = 'Oval'
     
-    // 1. Elongated
+    // 1. Elongated (Long face)
     if (heightUnits > 3.15) {
       bestShape = 'Elongated'
     } 
-    // 2. Angular Priority (Short face + visible jaw angle)
-    else if (heightUnits < 3.0 && jawAngle < 162) {
-      console.log('Angular trigger: Priority (Short + Angle)')
-      bestShape = 'Angular'
-    }
-    // 3. Jaw Dominance (Jaw width is equal or greater than cheekbones)
-    else if (jawUnits >= widthUnits * 0.98) {
+    // 2. Angular Dominance (Jaw is wider than cheekbones)
+    else if (jawUnits >= widthUnits * 1.02) {
       console.log('Angular trigger: Jaw Dominance')
       bestShape = 'Angular'
     }
-    // 4. Angular Normal (Wide jaw + sharp angle)
-    else if (jawAngle < 162 && jawUnits > 2.65) {
-      console.log('Angular trigger: Normal conditions')
+    // 3. Angular Priority (Visible jaw angle on a non-elongated face)
+    else if (jawAngle < 156 && jawUnits > 2.7) {
+      console.log('Angular trigger: Sharp Jaw')
       bestShape = 'Angular'
     }
-    // 5. Rounded
-    else if (jawAngle > 162 && widthUnits > 3.0) {
+    // 4. Rounded (Wide face + very smooth jaw line)
+    else if (jawAngle > 163 && widthUnits > 3.0) {
       bestShape = 'Rounded'
     }
-    // 6. Oval (Strict range)
-    else if (heightUnits >= 2.9 && heightUnits <= 3.15 && jawAngle >= 155 && jawAngle <= 162) {
+    // 5. Oval (The "Golden Ratio" window)
+    else if (heightUnits >= 2.85 && heightUnits <= 3.15 && jawAngle >= 156 && jawAngle <= 163) {
       bestShape = 'Oval'
     } 
     else {
-      bestShape = heightUnits < 2.9 ? 'Rounded' : 'Oval'
+      // Fallback
+      bestShape = heightUnits < 2.85 ? 'Rounded' : 'Oval'
     }
 
     // Add to buffer for stabilization of the classification
