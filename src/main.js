@@ -365,7 +365,13 @@ document.querySelectorAll('.cal-btn').forEach(btn => {
     const label = btn.dataset.shape;
     const data = {
       label,
-      metrics: currentMetrics
+      metrics: currentMetrics,
+      device: {
+        userAgent: navigator.userAgent,
+        platform: navigator.platform,
+        isTouch: 'ontouchstart' in window
+      },
+      env: window.location.hostname
     };
     
     try {
