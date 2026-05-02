@@ -66,7 +66,7 @@ function load3DModel(path) {
     const center = box.getCenter(new THREE.Vector3())
     
     current3DModel.position.sub(center) // Center the model
-    current3DModel.position.z = -0.05    // Seat it deeper on the nose bridge
+    current3DModel.position.z = -0.4     // Much deeper default seating
     
     // Normalize size (assuming 1.8 units is a good width)
     const scale = 1.8 / size.x
@@ -130,7 +130,7 @@ uiOverlay.innerHTML = `
             </div>
             <div class="setting-row">
               <label>Depth</label>
-              <input type="range" id="sliderZ" min="-1.0" max="1.0" step="0.05" value="0.0">
+              <input type="range" id="sliderZ" min="-5.0" max="5.0" step="0.1" value="0.0">
             </div>
           </div>
         </div>
@@ -251,7 +251,7 @@ function update3D(landmarks, matrix) {
   // Apply manual Y offset (multiplied by scale for consistency)
   const tx = (0.5 - p6.x) * vW
   const ty = (0.5 - p6.y) * vH + (manualY * 0.5) 
-  const tz = manualZ * 0.5 // Manual Depth
+  const tz = manualZ * 1.5 // Increased depth multiplier
   
   faceGroup.position.set(tx, ty, tz)
 
