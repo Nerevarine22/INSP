@@ -58,6 +58,9 @@ app.innerHTML = `
             <div class="frame-item" data-src="/pngwing.com.png">
               <img src="/pngwing.com.png" alt="Frame 3">
             </div>
+            <div class="frame-item" data-src="/image.png">
+              <img src="/image.png" alt="Frame 4">
+            </div>
           </div>
 
           <div class="metrics-row" style="display: none;">
