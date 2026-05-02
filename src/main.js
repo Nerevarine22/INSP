@@ -241,6 +241,12 @@ function loop() {
   requestAnimationFrame(loop)
 }
 
+// Smoothing State
+let smoothedPos = new THREE.Vector3()
+let smoothedQuat = new THREE.Quaternion()
+let smoothedScale = new THREE.Vector3(1, 1, 1)
+const LERP_FACTOR = 0.2 // (0.8 old + 0.2 new)
+
 function update3D(landmarks, matrix) {
   faceGroup.visible = true
   const p6 = landmarks[6]
@@ -248,27 +254,36 @@ function update3D(landmarks, matrix) {
   const vH = 2 * Math.tan((45 * Math.PI / 180) / 2) * 5
   const vW = vH * aspect
 
-  // Apply manual Y offset (multiplied by scale for consistency)
-  const tx = (0.5 - p6.x) * vW
-  const ty = (0.5 - p6.y) * vH + (manualY * 0.5) 
-  const tz = manualZ * 1.5 // Increased depth multiplier
-  
-  faceGroup.position.set(tx, ty, tz)
+  // Target values
+  const targetPos = new THREE.Vector3(
+    (0.5 - p6.x) * vW,
+    (0.5 - p6.y) * vH,
+    manualZ * 1.5 // Manual Depth from slider
+  )
+  targetPos.y += (manualY * 0.5) // Manual Height from slider
 
+  const targetQuat = new THREE.Quaternion()
   if (matrix) {
     const m = new THREE.Matrix4().fromArray(matrix.data)
     const pos = new THREE.Vector3(), quat = new THREE.Quaternion(), scl = new THREE.Vector3()
     m.decompose(pos, quat, scl)
     quat.y = -quat.y
     quat.z = -quat.z
-    faceGroup.quaternion.copy(quat)
+    targetQuat.copy(quat)
   }
 
   const p33 = landmarks[33]
   const p263 = landmarks[263]
   const eyeDist = Math.sqrt(Math.pow(p33.x - p263.x, 2) + Math.pow(p33.y - p263.y, 2))
-  
-  // Base scale 2.45 * manual slider
   const s = eyeDist * 2.45 * manualScale
-  faceGroup.scale.set(s, s, s)
+  const targetScale = new THREE.Vector3(s, s, s)
+
+  // Apply Exponential Smoothing (EMA)
+  smoothedPos.lerp(targetPos, LERP_FACTOR)
+  smoothedQuat.slerp(targetQuat, LERP_FACTOR)
+  smoothedScale.lerp(targetScale, LERP_FACTOR)
+
+  faceGroup.position.copy(smoothedPos)
+  faceGroup.quaternion.copy(smoothedQuat)
+  faceGroup.scale.copy(smoothedScale)
 }
