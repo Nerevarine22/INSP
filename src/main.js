@@ -32,11 +32,12 @@ scene.add(dirLight)
 const faceGroup = new THREE.Group()
 scene.add(faceGroup)
 
-// Head Occluder
+// Head Occluder (Invisible mask)
 const occluderGeometry = new THREE.SphereGeometry(1, 32, 32)
-occluderGeometry.scale(0.85, 1.15, 0.85)
+// Flatten the sphere in Z so it doesn't protrude forward
+occluderGeometry.scale(0.85, 1.15, 0.5) 
 const headOccluder = new THREE.Mesh(occluderGeometry, new THREE.MeshBasicMaterial({ colorWrite: false }))
-headOccluder.position.z = -0.3
+headOccluder.position.z = -0.7 // Push it further back
 faceGroup.add(headOccluder)
 
 // Models State
@@ -47,7 +48,7 @@ const gltfLoader = new GLTFLoader()
 const textureLoader = new THREE.TextureLoader()
 const glassesMaterial = new THREE.MeshStandardMaterial({ transparent: true, side: THREE.DoubleSide })
 const glassesPlane = new THREE.Mesh(new THREE.PlaneGeometry(2, 0.8), glassesMaterial)
-glassesPlane.position.z = 0.4
+glassesPlane.position.z = 0.2 // Adjusted Z-position to sit safely in front of the head
 faceGroup.add(glassesPlane)
 
 // Load 3D Model Function
@@ -65,7 +66,7 @@ function load3DModel(path) {
     const center = box.getCenter(new THREE.Vector3())
     
     current3DModel.position.sub(center) // Center the model
-    current3DModel.position.z = 0.3      // Shift to nose bridge
+    current3DModel.position.z = 0.2      // Adjusted Z-position to sit safely in front of the head
     
     // Normalize size (assuming 1.8 units is a good width)
     const scale = 1.8 / size.x
@@ -234,7 +235,7 @@ function update3D(landmarks, matrix) {
   const p263 = landmarks[263]
   const eyeDist = Math.sqrt(Math.pow(p33.x - p263.x, 2) + Math.pow(p33.y - p263.y, 2))
   
-  // Adjusted multiplier from 8.5 to ~2.8 to fit the face
-  const s = eyeDist * 3.1 
+  // Scale reduced to 2.1
+  const s = eyeDist * 2.1 
   faceGroup.scale.set(s, s, s)
 }
