@@ -87,7 +87,6 @@ function switchFrame(config) {
 
 // Load 3D Model Function
 function load3DModel(path, texturePath = null) {
-  glassesPlane.visible = false
   if (current3DModel) faceGroup.remove(current3DModel)
 
   gltfLoader.load(path, (gltf) => {
