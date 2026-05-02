@@ -92,64 +92,32 @@ const faceMetricsBuffer = []
 const MAX_METRICS_BUFFER = 15
 
 // ─── Constants & State ───────────────────────────────────────────────────────
-const CONTOUR_INDICES = [234, 132, 140, 152, 369, 361, 454, 10]
+// Face Shape Points:
+// 8: Between eyebrows
+// 2: Base of nose
+// 10: Top forehead
+// 152: Chin
+// 234, 454: Cheekbones (left/right)
+// 132, 361: Jaw angles (left/right)
 
-// Normalized templates (bounding box 0..1, rotated to align eyes)
-// Realistic proportions: cheek-to-chin height is usually 70-80% of face width.
-const FACE_TEMPLATES = {
-  'Rounded': [
-    {x: 0.0,  y: 0.0},   // L cheek
-    {x: 0.12, y: 0.45},  // L jaw
-    {x: 0.28, y: 0.65},  // L chin-side
-    {x: 0.5,  y: 0.75},  // Chin
-    {x: 0.72, y: 0.65},  // R chin-side
-    {x: 0.88, y: 0.45},  // R jaw
-    {x: 1.0,  y: 0.0},   // R cheek
-    {x: 0.5,  y: -0.55}  // Top forehead (Total FR ~ 1.30)
-  ],
-  'Angular': [
-    {x: 0.0,  y: 0.0},
-    {x: 0.05, y: 0.50}, // very wide jaw
-    {x: 0.22, y: 0.70}, // sharp turn to chin
-    {x: 0.5,  y: 0.75},
-    {x: 0.78, y: 0.70},
-    {x: 0.95, y: 0.50},
-    {x: 1.0,  y: 0.0},
-    {x: 0.5,  y: -0.60} // Top forehead (Total FR ~ 1.35)
-  ],
-  'Elongated': [
-    {x: 0.0,  y: 0.0},
-    {x: 0.15, y: 0.55},
-    {x: 0.30, y: 0.80},
-    {x: 0.5,  y: 0.90}, // long chin
-    {x: 0.70, y: 0.80},
-    {x: 0.85, y: 0.55},
-    {x: 1.0,  y: 0.0},
-    {x: 0.5,  y: -0.65} // Tall forehead (Total FR ~ 1.55)
-  ]
+const uBuffer = []
+const MAX_U_BUFFER = 20
+
+function getPointDist(p1, p2) {
+  return Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2))
 }
 
-const calculateSimilarity = (userPoints, templatePoints) => {
-  // Translate so pt0 is at (0,0)
-  let pts = userPoints.map(p => ({ x: p.x - userPoints[0].x, y: p.y - userPoints[0].y }))
-  // Rotate so pt6 is at (width, 0)
-  const angle = Math.atan2(pts[6].y, pts[6].x)
-  pts = pts.map(p => ({
-    x: p.x * Math.cos(-angle) - p.y * Math.sin(-angle),
-    y: p.x * Math.sin(-angle) + p.y * Math.cos(-angle)
-  }))
-  // Scale so pt6 is at (1, 0)
-  const scale = pts[6].x > 0 ? 1 / pts[6].x : 0
-  pts = pts.map(p => ({ x: p.x * scale, y: p.y * scale }))
-  
-  // Calculate Euclidean error
-  let error = 0
-  for(let i = 0; i < pts.length; i++) {
-    const dx = pts[i].x - templatePoints[i].x
-    const dy = pts[i].y - templatePoints[i].y
-    error += Math.sqrt(dx*dx + dy*dy)
-  }
-  return error
+function pointToLineDist(pt, lineStart, lineEnd) {
+  const num = Math.abs((lineEnd.x - lineStart.x) * (lineStart.y - pt.y) - (lineStart.x - pt.x) * (lineEnd.y - lineStart.y))
+  const den = getPointDist(lineStart, lineEnd)
+  return den === 0 ? 0 : num / den
+}
+
+function getMedian(arr) {
+  if (arr.length === 0) return 0
+  const sorted = [...arr].sort((a, b) => a - b)
+  const mid = Math.floor(sorted.length / 2)
+  return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2
 }
 
 const glassesImg = new Image()
@@ -365,6 +333,7 @@ function renderLoop() {
       faceShapeCategory.textContent = 'Analyzing...';
       currentCategoryStr = null;
       faceMetricsBuffer.length = 0;
+      uBuffer.length = 0;
       if (shapeDetectTimeout) clearTimeout(shapeDetectTimeout);
     }
   } else {
@@ -476,84 +445,102 @@ function drawGlasses(ctx, landmarks, matrix, w, h) {
   
   ctx.restore()
   
-  // Face Shape detection using Template Similarity
-  const userPts = CONTOUR_INDICES.map(idx => ({
-    x: flipX ? (1 - landmarks[idx].x) : landmarks[idx].x,
-    y: landmarks[idx].y
-  }))
-  
-  const errors = {
-    'Rounded': calculateSimilarity(userPts, FACE_TEMPLATES['Rounded']),
-    'Angular': calculateSimilarity(userPts, FACE_TEMPLATES['Angular']),
-    'Elongated': calculateSimilarity(userPts, FACE_TEMPLATES['Elongated'])
-  }
-
-  // Add to buffer
-  if (faceMetricsBuffer.length >= MAX_METRICS_BUFFER) {
-    faceMetricsBuffer.shift()
-  }
-  faceMetricsBuffer.push(errors)
-
-  // Average the errors over the buffer
-  const avgErrors = { 'Rounded': 0, 'Angular': 0, 'Elongated': 0 }
-  faceMetricsBuffer.forEach(e => {
-    avgErrors['Rounded'] += e['Rounded']
-    avgErrors['Angular'] += e['Angular']
-    avgErrors['Elongated'] += e['Elongated']
+  // Face Shape detection using Nose Units (U)
+  const getP = (idx) => ({
+    x: (flipX ? (1 - landmarks[idx].x) : landmarks[idx].x) * w,
+    y: landmarks[idx].y * h
   })
-  const count = faceMetricsBuffer.length
-  avgErrors['Rounded'] /= count
-  avgErrors['Angular'] /= count
-  avgErrors['Elongated'] /= count
 
-  // Find minimum error
-  let bestShape = Object.keys(avgErrors).reduce((a, b) => avgErrors[a] < avgErrors[b] ? a : b)
+  const p8 = getP(8)
+  const p2 = getP(2)
+  const p10 = getP(10)
+  const p152 = getP(152)
+  const p234 = getP(234)
+  const p454 = getP(454)
+  const p132 = getP(132)
+  const p361 = getP(361)
 
-  // Soft transition (5% hysteresis margin)
-  if (currentShapeKey && currentShapeKey !== bestShape) {
-    const currentError = avgErrors[currentShapeKey]
-    const bestError = avgErrors[bestShape]
-    // If the new shape isn't at least 5% better than the current one, stick with the current one
-    if (bestError > currentError * 0.95) {
-      bestShape = currentShapeKey
+  // Step 1: Calculate raw U
+  const rawU = getPointDist(p8, p2)
+  
+  if (uBuffer.length >= MAX_U_BUFFER) uBuffer.shift()
+  uBuffer.push(rawU)
+  
+  // Filtered U using median
+  const U = getMedian(uBuffer)
+
+  if (U > 0) {
+    // Step 2: Normalization
+    const heightUnits = getPointDist(p10, p152) / U
+    const widthUnits = getPointDist(p234, p454) / U
+    const jawUnits = getPointDist(p132, p361) / U
+    
+    // Bezier Offset
+    const bezierOffsetPx = pointToLineDist(p132, p234, p152)
+    const bezierOffset = bezierOffsetPx / U
+
+    // Step 3: Classification
+    let bestShape = 'Oval'
+    if (heightUnits > 3.35) {
+      bestShape = 'Elongated'
+    } else if (jawUnits > 2.85 && bezierOffset > 0.15) {
+      bestShape = 'Angular'
+    } else if (widthUnits > 3.1 && jawUnits < 2.7) {
+      bestShape = 'Rounded'
+    }
+
+    // Add to buffer for stabilization of the classification
+    if (faceMetricsBuffer.length >= MAX_METRICS_BUFFER) faceMetricsBuffer.shift()
+    faceMetricsBuffer.push(bestShape)
+
+    // Determine the most frequent shape in buffer
+    const counts = faceMetricsBuffer.reduce((acc, shape) => {
+      acc[shape] = (acc[shape] || 0) + 1
+      return acc
+    }, {})
+    
+    currentShapeKey = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b)
+
+    let category, advice
+    let recommendedModels = []
+
+    if (currentShapeKey === 'Elongated') {
+      category = 'Elongated (Подовжене)'
+      advice = 'Обличчя витягнуте: обирайте виключно великі оправи (Oversized, Авіатори).'
+      recommendedModels = ['Aviator (Авіатори)', 'Oversized', 'Wayfarer']
+    } else if (currentShapeKey === 'Angular') {
+      category = 'Angular (Квадратне/Гостре)'
+      advice = 'Виражені кути щелепи: пом\'якшуйте лінію обличчя коло/овалом.'
+      recommendedModels = ['Round (Круглі)', 'Oval (Овальні)', 'Panto']
+    } else if (currentShapeKey === 'Rounded') {
+      category = 'Rounded (Кругле/Серце)'
+      advice = 'Плавні лінії обличчя: додайте кутів за допомогою прямокутних оправ.'
+      recommendedModels = ['Square (Квадратні)', 'Rectangular (Прямокутні)', 'Cat-eye (Котяче око)']
+    } else {
+      category = 'Oval (Універсальне/Еталон)'
+      advice = 'Ідеальні пропорції: вам підійде більшість оправ. Експериментуйте з формами!'
+      recommendedModels = ['Aviator (Авіатори)', 'Wayfarer', 'Cat-eye (Котяче око)', 'Round (Круглі)']
+    }
+
+    let models = recommendedModels.join(', ')
+
+    if (category !== currentCategoryStr) {
+      currentCategoryStr = category
+      faceShapeCategory.textContent = 'Analyzing...'
+      recBody.hidden = true
+      
+      if (shapeDetectTimeout) clearTimeout(shapeDetectTimeout)
+      
+      shapeDetectTimeout = setTimeout(() => {
+        faceShapeCategory.textContent = category
+        faceShapeAdvice.textContent = advice
+        faceShapeModels.textContent = models
+        recBody.hidden = false
+      }, 2000)
     }
   }
-  currentShapeKey = bestShape
 
-  let category, advice
-  let recommendedModels = []
 
-  // Assign based on best shape template
-  if (bestShape === 'Elongated') {
-    category = 'Elongated (Подовжене)'
-    advice = 'Обличчя витягнуте: обирайте виключно великі оправи (Oversized, Авіатори).'
-    recommendedModels = ['Aviator (Авіатори)', 'Oversized', 'Wayfarer']
-  } else if (bestShape === 'Angular') {
-    category = 'Angular (Квадратне/Гостре)'
-    advice = 'Виражені кути щелепи: пом\'якшуйте лінію обличчя коло/овалом.'
-    recommendedModels = ['Round (Круглі)', 'Oval (Овальні)', 'Panto']
-  } else {
-    category = 'Rounded (Кругле/Серце)'
-    advice = 'Плавні лінії обличчя: додайте кутів за допомогою прямокутних оправ.'
-    recommendedModels = ['Square (Квадратні)', 'Rectangular (Прямокутні)', 'Cat-eye (Котяче око)']
-  }
-
-  let models = recommendedModels.join(', ')
-
-  if (category !== currentCategoryStr) {
-    currentCategoryStr = category
-    faceShapeCategory.textContent = 'Analyzing...'
-    recBody.hidden = true
-    
-    if (shapeDetectTimeout) clearTimeout(shapeDetectTimeout)
-    
-    shapeDetectTimeout = setTimeout(() => {
-      faceShapeCategory.textContent = category
-      faceShapeAdvice.textContent = advice
-      faceShapeModels.textContent = models
-      recBody.hidden = false
-    }, 2000)
-  }
 
   recommendationCard.hidden = false
   recommendationCard.style.boxShadow = '0 0 0 2px var(--success), 0 14px 30px rgba(125, 227, 161, 0.15)'
