@@ -681,34 +681,34 @@ function drawGlasses(ctx, landmarks, matrix, w, h) {
       w: widthUnits
     };
 
-    // Step 4: Classification Logic (Refined with 'Deciding Vote' diff)
+    // Step 4: Classification Logic (Balanced Delta)
     let bestShape = 'Oval';
-    const diffWJ = widthUnits - jawUnits; // The 'Deciding Vote' delta
+    const diffWJ = widthUnits - jawUnits;
 
-    // Priority 1: Elongated (High height ratio)
+    // Priority 1: Elongated
     if (heightUnits > 2.95 && widthUnits < 2.5) {
       bestShape = 'Elongated';
     } 
-    // Priority 2: Sharp Angle Priority (< 138 deg)
-    else if (jawAngle < 138) {
+    // Priority 2: Very Sharp Angle (< 136 deg)
+    else if (jawAngle < 136) {
       bestShape = 'Angular';
     }
-    // Priority 3: The 'Deciding Vote' (W - J delta)
-    else if (diffWJ > 0.15) {
-      // Cheekbones are significantly wider than jaw -> Rounded
+    // Priority 3: The 'Deciding Vote' (Balanced)
+    else if (diffWJ > 0.10) {
+      // Cheekbones clearly wider -> Rounded
       bestShape = 'Rounded';
     }
-    else if (diffWJ < 0.10) {
-      // Jaw is almost as wide as cheekbones -> Angular (Square)
+    else if (diffWJ < 0.07) {
+      // Jaw is almost the same width as cheekbones -> Angular
       bestShape = 'Angular';
     }
-    // Priority 4: Standard Ranges for Oval and subtle matches
-    else if (jawAngle > 145 && heightUnits < 2.9) {
+    // Priority 4: Standard Ranges
+    else if (jawAngle > 144 && heightUnits < 2.9) {
       bestShape = 'Oval';
     }
     else {
-      // Fallback
-      if (widthUnits > 2.65) bestShape = 'Rounded';
+      // Default fallback
+      if (widthUnits > 2.62) bestShape = 'Rounded';
       else bestShape = 'Oval';
     }
 
