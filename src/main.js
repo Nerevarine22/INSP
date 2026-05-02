@@ -4,7 +4,7 @@ const app = document.querySelector('#app')
 
 app.innerHTML = `
   <main class="mobile-shell">
-    <section class="viewer-panel">
+    <section class="viewer-panel" id="mainViewer">
       <div class="camera-stage">
         <video id="videoElement" autoplay playsinline hidden></video>
         <canvas id="outputCanvas" class="output-canvas" aria-label="Camera preview"></canvas>
@@ -34,15 +34,22 @@ app.innerHTML = `
               <p class="rec-models"><strong>Моделі:</strong> <span id="faceShapeModels"></span></p>
             </div>
           </div>
-          <div class="metrics-row" style="display: none;">
-            <div class="metric-card">
-              <span class="metric-label">Tracking</span>
-              <strong id="trackingValue">Waiting</strong>
-            </div>
-            <div class="metric-card">
-              <span class="metric-label">Rotation</span>
-              <strong id="rotationValue">0 deg, 0 deg, 0 deg</strong>
-            </div>
+          
+          <!-- Calibration Controls -->
+          <div class="calibration-panel" id="calibrationPanel" hidden>
+             <p class="calibration-title">Capture Data for Weight Tuning</p>
+             <div class="calibration-buttons">
+                <button class="cal-btn" data-shape="Elongated">Elongated</button>
+                <button class="cal-btn" data-shape="Angular">Angular</button>
+                <button class="cal-btn" data-shape="Rounded">Rounded</button>
+                <button class="cal-btn" data-shape="Oval">Oval</button>
+             </div>
+             <p class="calibration-status" id="calStatus">No samples yet</p>
+          </div>
+
+          <div class="bottom-actions">
+            <button id="toggleCalButton" class="secondary-button">Toggle Calibration</button>
+            <a href="#stats" id="statsLink" class="secondary-button">Stats Page</a>
           </div>
         </div>
 
@@ -54,6 +61,33 @@ app.innerHTML = `
           </div>
           <p id="loadingLabel" class="loading-label">Loading…</p>
         </div>
+      </div>
+    </section>
+
+    <!-- Stats View -->
+    <section class="stats-panel" id="statsPanel" style="display: none;">
+      <div class="stats-header">
+        <h2>Collected Dataset</h2>
+        <div style="display: flex; gap: 10px;">
+          <button id="refreshStats" class="secondary-button">Refresh</button>
+          <button id="downloadJson" class="primary-button">Download JSON</button>
+          <button id="backToApp" class="secondary-button">Back</button>
+        </div>
+      </div>
+      <div class="stats-content">
+         <table id="statsTable">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Label</th>
+                <th>Angle</th>
+                <th>Height</th>
+                <th>Jaw</th>
+                <th>Width</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+         </table>
       </div>
     </section>
   </main>
@@ -83,6 +117,10 @@ let faceLandmarker = null
 let animationId = null
 let lastVideoTime = -1
 let currentFacingMode = 'user'
+
+// Calibration State
+let currentMetrics = null;
+let savedSamplesCount = 0;
 
 // Smart Stylist Debounce State
 let shapeDetectTimeout = null
@@ -275,6 +313,107 @@ async function startExperience() {
 }
 
 startButton.addEventListener('click', startExperience)
+
+// ─── Calibration & Routing Logic ──────────────────────────────────────────
+const mainViewer = document.querySelector('#mainViewer');
+const statsPanel = document.querySelector('#statsPanel');
+const calibrationPanel = document.querySelector('#calibrationPanel');
+const toggleCalButton = document.querySelector('#toggleCalButton');
+const calStatus = document.querySelector('#calStatus');
+const statsTableBody = document.querySelector('#statsTable tbody');
+
+function syncRoute() {
+  if (window.location.hash === '#stats') {
+    mainViewer.style.display = 'none';
+    statsPanel.style.display = 'flex';
+    loadStats();
+  } else {
+    mainViewer.style.display = 'block';
+    statsPanel.style.display = 'none';
+  }
+}
+
+window.addEventListener('hashchange', syncRoute);
+syncRoute();
+
+toggleCalButton.addEventListener('click', () => {
+  calibrationPanel.hidden = !calibrationPanel.hidden;
+});
+
+document.querySelector('#backToApp').addEventListener('click', () => { window.location.hash = ''; });
+document.querySelector('#refreshStats').addEventListener('click', loadStats);
+
+document.querySelectorAll('.cal-btn').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    if (!currentMetrics) {
+      alert("No face detected!");
+      return;
+    }
+    
+    const label = btn.dataset.shape;
+    const data = {
+      label,
+      metrics: currentMetrics
+    };
+    
+    try {
+      btn.disabled = true;
+      const res = await fetch('/api/save-calibration', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      const result = await res.json();
+      savedSamplesCount = result.count;
+      calStatus.textContent = `Saved! Total samples: ${savedSamplesCount}`;
+      btn.style.background = 'var(--success)';
+      setTimeout(() => { 
+        btn.style.background = '';
+        btn.disabled = false;
+      }, 500);
+    } catch (e) {
+      console.error(e);
+      alert("Failed to save to server. Make sure you are running 'npm run dev' on PC.");
+      btn.disabled = false;
+    }
+  });
+});
+
+async function loadStats() {
+  try {
+    const res = await fetch('/calibration_data.json');
+    if (!res.ok) throw new Error("File not found");
+    const data = await res.json();
+    
+    statsTableBody.innerHTML = data.reverse().map(s => `
+      <tr>
+        <td>${s.id.toString().slice(-6)}</td>
+        <td><strong>${s.label}</strong></td>
+        <td>${s.metrics.angle.toFixed(2)}°</td>
+        <td>${s.metrics.h.toFixed(2)}</td>
+        <td>${s.metrics.j.toFixed(2)}</td>
+        <td>${s.metrics.w.toFixed(2)}</td>
+      </tr>
+    `).join('');
+  } catch (e) {
+    statsTableBody.innerHTML = '<tr><td colspan="6">No data yet. Start scanning on phone!</td></tr>';
+  }
+}
+
+document.querySelector('#downloadJson').addEventListener('click', async () => {
+  try {
+    const res = await fetch('/calibration_data.json');
+    const data = await res.json();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'face_calibration_dataset.json';
+    a.click();
+  } catch (e) {
+    alert("Nothing to download yet.");
+  }
+});
 
 flipCameraButton.addEventListener('click', async () => {
   if (!isTracking) return
@@ -496,6 +635,14 @@ function drawGlasses(ctx, landmarks, matrix, w, h) {
     // Step 3: Classification
     console.log(`--- Metrics: Angle=${jawAngle.toFixed(2)}, H=${heightUnits.toFixed(2)}, J=${jawUnits.toFixed(2)}, W=${widthUnits.toFixed(2)} ---`)
     
+    // Store for calibration
+    currentMetrics = {
+      angle: jawAngle,
+      h: heightUnits,
+      j: jawUnits,
+      w: widthUnits
+    };
+
     let bestShape = 'Oval'
     
     // 1. Elongated (Long face)

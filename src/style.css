@@ -89,8 +89,22 @@ select {
   bottom: 0;
   flex-direction: column;
   align-items: stretch;
-  background: linear-gradient(0deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%);
+  background: linear-gradient(0deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 100%);
   padding-bottom: 2rem;
+}
+
+.bottom-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.bottom-actions .secondary-button, 
+.bottom-actions a {
+  flex: 1;
+  text-decoration: none;
+  font-size: 0.85rem;
+  padding: 0.8rem;
 }
 
 .metrics-row {
@@ -339,4 +353,127 @@ select {
 
 .vertical-slider[hidden] {
   display: none !important;
+}
+
+/* ─── Calibration Panel ─────────────────────────────────── */
+
+.calibration-panel {
+  pointer-events: auto;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(15px);
+  border: 1px solid var(--accent);
+  border-radius: 20px;
+  padding: 1.2rem;
+  margin-bottom: 1rem;
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.calibration-title {
+  margin: 0 0 1rem 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  text-align: center;
+}
+
+.calibration-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+
+.cal-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  color: white;
+  padding: 0.7rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cal-btn:active {
+  transform: scale(0.95);
+  background: var(--accent);
+  color: #000;
+}
+
+.calibration-status {
+  margin: 0.8rem 0 0 0;
+  font-size: 0.8rem;
+  text-align: center;
+  color: var(--success);
+}
+
+/* ─── Stats Panel ───────────────────────────────────────── */
+
+.stats-panel {
+  position: absolute;
+  inset: 0;
+  background: var(--panel-strong);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem;
+  overflow: hidden;
+}
+
+.stats-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-shrink: 0;
+}
+
+.stats-header h2 {
+  margin: 0;
+  font-size: 1.4rem;
+  color: var(--accent);
+}
+
+.stats-content {
+  flex: 1;
+  overflow-y: auto;
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--line);
+}
+
+#statsTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+#statsTable th, 
+#statsTable td {
+  padding: 1rem;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+}
+
+#statsTable th {
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+}
+
+#statsTable tr:last-child td {
+  border-bottom: none;
+}
+
+#statsTable strong {
+  color: var(--accent);
 }
