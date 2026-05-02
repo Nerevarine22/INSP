@@ -98,6 +98,52 @@ select {
   padding-bottom: 40px;
 }
 
+/* --- Frame Gallery --- */
+.frame-gallery {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 10px 5px;
+  pointer-events: auto;
+  scrollbar-width: none; /* Hide scrollbar Firefox */
+  margin-bottom: 5px;
+}
+
+.frame-gallery::-webkit-scrollbar {
+  display: none; /* Hide scrollbar Chrome/Safari */
+}
+
+.frame-item {
+  flex: 0 0 70px;
+  height: 70px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  overflow: hidden;
+}
+
+.frame-item img {
+  width: 80%;
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
+}
+
+.frame-item.active {
+  border-color: var(--accent);
+  background: rgba(245, 211, 104, 0.15);
+  transform: scale(1.05);
+}
+
+.frame-item:active {
+  transform: scale(0.95);
+}
+
 .bottom-actions {
   display: flex;
   gap: 0.6rem;

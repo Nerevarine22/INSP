@@ -47,7 +47,19 @@ app.innerHTML = `
              <p class="calibration-status" id="calStatus">No samples yet</p>
           </div>
 
-          <!-- Metrics (hidden but needed for stability) -->
+          <!-- Frame Selector Gallery -->
+          <div class="frame-gallery" id="frameGallery">
+            <div class="frame-item active" data-src="/glasses.svg">
+              <img src="/glasses.svg" alt="Frame 1">
+            </div>
+            <div class="frame-item" data-src="/image-Photoroom.png">
+              <img src="/image-Photoroom.png" alt="Frame 2">
+            </div>
+            <div class="frame-item" data-src="/pngwing.com.png">
+              <img src="/pngwing.com.png" alt="Frame 3">
+            </div>
+          </div>
+
           <div class="metrics-row" style="display: none;">
             <div class="metric-card">
               <span class="metric-label">Tracking</span>
@@ -129,6 +141,16 @@ let faceLandmarker = null
 let animationId = null
 let lastVideoTime = -1
 let currentFacingMode = 'user'
+
+// Frame Gallery Logic
+document.querySelectorAll('.frame-item').forEach(item => {
+  item.addEventListener('click', () => {
+    document.querySelectorAll('.frame-item').forEach(f => f.classList.remove('active'));
+    item.classList.add('active');
+    const newSrc = item.getAttribute('data-src');
+    glassesImg.src = newSrc;
+  });
+});
 
 // Calibration State
 let currentMetrics = null;
