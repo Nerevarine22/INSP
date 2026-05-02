@@ -621,11 +621,50 @@ function drawGlasses(ctx, landmarks, matrix, w, h) {
   // Draw on Canvas
   ctx.save()
   
-  // Apply Y offset from slider (userYOffsetRatio is a fraction of the glasses width)
+  // Apply Y offset from slider
   const yOffset = smoothedPos.w * userYOffsetRatio
+  const anchorX = smoothedPos.x
+  const anchorY = smoothedPos.y - yOffset
 
-  // Move to anchor (pt 6 is lower on the nose bridge, closer to where glasses naturally rest)
-  ctx.translate(smoothedPos.x, smoothedPos.y - yOffset)
+  // ─── Draw Temples (Arms) ───
+  const pL_Ear = {
+    x: (flipX ? (1 - landmarks[127].x) : landmarks[127].x) * w,
+    y: landmarks[127].y * h
+  }
+  const pR_Ear = {
+    x: (flipX ? (1 - landmarks[389].x) : landmarks[389].x) * w,
+    y: landmarks[389].y * h
+  }
+
+  const drawTemple = (startX, startY, endX, endY) => {
+    ctx.save()
+    const grad = ctx.createLinearGradient(startX, startY, endX, endY)
+    grad.addColorStop(0, 'rgba(30, 30, 30, 0.9)')
+    grad.addColorStop(0.8, 'rgba(30, 30, 30, 0.3)')
+    grad.addColorStop(1, 'rgba(30, 30, 30, 0)')
+    ctx.beginPath()
+    ctx.strokeStyle = grad
+    ctx.lineWidth = smoothedPos.w * 0.04
+    ctx.lineCap = 'round'
+    ctx.shadowBlur = 10
+    ctx.shadowColor = 'rgba(0,0,0,0.5)'
+    ctx.moveTo(startX, startY)
+    ctx.lineTo(endX, endY)
+    ctx.stroke()
+    ctx.restore()
+  }
+
+  const halfW = (smoothedPos.w / 2) * Math.cos(smoothedPos.yaw)
+  const fLx = anchorX - halfW * Math.cos(smoothedPos.roll)
+  const fLy = anchorY - halfW * Math.sin(smoothedPos.roll)
+  const fRx = anchorX + halfW * Math.cos(smoothedPos.roll)
+  const fRy = anchorY + halfW * Math.sin(smoothedPos.roll)
+
+  drawTemple(fLx, fLy, pL_Ear.x, pL_Ear.y)
+  drawTemple(fRx, fRy, pR_Ear.x, pR_Ear.y)
+
+  // ─── Draw Main Frame ───
+  ctx.translate(anchorX, anchorY)
   
   // Rotate
   ctx.rotate(smoothedPos.roll)
