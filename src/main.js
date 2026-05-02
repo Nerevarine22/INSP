@@ -60,8 +60,14 @@ app.innerHTML = `
           </div>
 
           <div class="bottom-actions">
-            <button id="toggleCalButton" class="secondary-button">Toggle Calibration</button>
-            <a href="#stats" id="statsLink" class="secondary-button">Stats Page</a>
+            <div class="toggle-group">
+              <label class="switch-label">
+                <input type="checkbox" id="autoDetectToggle" checked>
+                <span class="switch-text">Auto AI</span>
+              </label>
+            </div>
+            <button id="toggleCalButton" class="secondary-button">Calibration</button>
+            <a href="#stats" id="statsLink" class="secondary-button">Stats</a>
           </div>
         </div>
 
@@ -138,6 +144,7 @@ let savedSamplesCount = 0;
 let shapeDetectTimeout = null
 let currentCategoryStr = null
 let currentShapeKey = null
+let isAutoDetectionEnabled = true
 const faceMetricsBuffer = []
 const MAX_METRICS_BUFFER = 15
 
@@ -347,6 +354,16 @@ function syncRoute() {
 
 window.addEventListener('hashchange', syncRoute);
 syncRoute();
+
+const autoDetectToggle = document.querySelector('#autoDetectToggle');
+
+autoDetectToggle.addEventListener('change', (e) => {
+  isAutoDetectionEnabled = e.target.checked;
+  if (!isAutoDetectionEnabled) {
+    recommendationCard.hidden = true;
+    currentCategoryStr = null;
+  }
+});
 
 toggleCalButton.addEventListener('click', () => {
   calibrationPanel.hidden = !calibrationPanel.hidden;
@@ -650,7 +667,12 @@ function drawGlasses(ctx, landmarks, matrix, w, h) {
     const angleR = getAngle(p361, p454, p152)
     const jawAngle = (angleL + angleR) / 2
 
-    // Step 3: Classification
+    // Step 3: Classification (Only if Auto Detection is enabled)
+    if (!isAutoDetectionEnabled) {
+       recommendationCard.hidden = true;
+       return;
+    }
+
     console.log(`--- Metrics: Angle=${jawAngle.toFixed(2)}, H=${heightUnits.toFixed(2)}, J=${jawUnits.toFixed(2)}, W=${widthUnits.toFixed(2)} ---`)
     
     // Store for calibration
