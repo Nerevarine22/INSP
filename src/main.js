@@ -370,6 +370,12 @@ autoDetectToggle.addEventListener('change', (e) => {
 
 toggleCalButton.addEventListener('click', () => {
   calibrationPanel.hidden = !calibrationPanel.hidden;
+  // If we open calibration, hide the smart stylist to avoid overlap
+  if (!calibrationPanel.hidden) {
+    recommendationCard.hidden = true;
+  } else if (isAutoDetectionEnabled) {
+    // If we close calibration and AI is on, it will show up on next detect
+  }
 });
 
 document.querySelector('#backToApp').addEventListener('click', () => { window.location.hash = ''; });
@@ -402,16 +408,18 @@ document.querySelectorAll('.cal-btn').forEach(btn => {
         body: JSON.stringify(data)
       });
       const result = await res.json();
-      savedSamplesCount = result.count;
-      calStatus.textContent = `Saved! Total samples: ${savedSamplesCount}`;
+      calStatus.style.color = 'var(--success)';
+      calStatus.textContent = `✅ Saved as ${label}! (Total: ${savedSamplesCount})`;
       btn.style.background = 'var(--success)';
       setTimeout(() => { 
         btn.style.background = '';
         btn.disabled = false;
-      }, 500);
+        calStatus.textContent = `Ready for next capture`;
+      }, 1500);
     } catch (e) {
       console.error(e);
-      alert("Failed to save to server. Make sure you are running 'npm run dev' on PC.");
+      calStatus.style.color = 'var(--error)';
+      calStatus.textContent = "❌ Save failed!";
       btn.disabled = false;
     }
   });
@@ -518,14 +526,16 @@ function renderLoop() {
       recBody.hidden = true;
       faceShapeCategory.textContent = 'Analyzing...';
       currentCategoryStr = null;
+      currentMetrics = null; // IMPORTANT: Prevent saving invalid data
       faceMetricsBuffer.length = 0;
       uBuffer.length = 0;
       if (shapeDetectTimeout) clearTimeout(shapeDetectTimeout);
+
+      if (!calibrationPanel.hidden) {
+        calStatus.style.color = 'var(--warning)';
+        calStatus.textContent = "⚠️ Position face in frame...";
+      }
     }
-  } else {
-    // If we didn't process a new video frame, we still draw the last smoothed position to prevent flicker.
-    // However, the video isn't redrawn. Actually, we should redraw the last frame here too.
-    // The previous drawImage handles this automatically since video content hasn't changed.
   }
 
   animationId = requestAnimationFrame(renderLoop)
