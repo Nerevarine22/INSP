@@ -112,6 +112,7 @@ const recBody            = document.querySelector('#recBody')
 const faceShapeAdvice    = document.querySelector('#faceShapeAdvice')
 const faceShapeModels    = document.querySelector('#faceShapeModels')
 const toggleModeButton   = document.querySelector('#toggleModeButton')
+const calStatus          = document.querySelector('#calStatus')
 
 let isInitializing = false
 let isTracking = false
@@ -259,7 +260,7 @@ async function startExperience() {
     showLoading('Loading Wasm…', 40)
     // Create fileset resolver (using CDN for wasm files to keep bundle size small)
     const vision = await FilesetResolver.forVisionTasks(
-      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
+      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.34/wasm'
     )
     
     showLoading('Loading neural net…', 70)
@@ -320,8 +321,6 @@ startButton.addEventListener('click', startExperience)
 const mainViewer = document.querySelector('#mainViewer');
 const statsPanel = document.querySelector('#statsPanel');
 const calibrationPanel = document.querySelector('#calibrationPanel');
-const toggleCalButton = document.querySelector('#toggleCalButton');
-const calStatus = document.querySelector('#calStatus');
 const statsTableBody = document.querySelector('#statsTable tbody');
 
 function syncRoute() {
