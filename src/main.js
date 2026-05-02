@@ -60,14 +60,8 @@ app.innerHTML = `
           </div>
 
           <div class="bottom-actions">
-            <div class="toggle-group">
-              <label class="switch-label">
-                <input type="checkbox" id="autoDetectToggle" checked>
-                <span class="switch-text">Auto AI</span>
-              </label>
-            </div>
-            <button id="toggleCalButton" class="secondary-button">Calibration</button>
-            <a href="#stats" id="statsLink" class="secondary-button">Stats</a>
+            <button id="toggleModeButton" class="primary-button" style="flex: 2;">Switch to Calibration</button>
+            <a href="#stats" id="statsLink" class="secondary-button" style="flex: 1;">Stats</a>
           </div>
         </div>
 
@@ -337,7 +331,7 @@ startButton.addEventListener('click', startExperience)
 const mainViewer = document.querySelector('#mainViewer');
 const statsPanel = document.querySelector('#statsPanel');
 const calibrationPanel = document.querySelector('#calibrationPanel');
-const toggleCalButton = document.querySelector('#toggleCalButton');
+const toggleModeButton = document.querySelector('#toggleModeButton');
 const calStatus = document.querySelector('#calStatus');
 const statsTableBody = document.querySelector('#statsTable tbody');
 
@@ -355,21 +349,20 @@ function syncRoute() {
 window.addEventListener('hashchange', syncRoute);
 syncRoute();
 
-const autoDetectToggle = document.querySelector('#autoDetectToggle');
+let currentAppMode = 'stylist'; // 'stylist' or 'calibration'
 
-autoDetectToggle.addEventListener('change', (e) => {
-  isAutoDetectionEnabled = e.target.checked;
-  if (!isAutoDetectionEnabled) {
+toggleModeButton.addEventListener('click', () => {
+  if (currentAppMode === 'stylist') {
+    currentAppMode = 'calibration';
+    toggleModeButton.textContent = 'Switch to Stylist';
     recommendationCard.hidden = true;
-    calibrationPanel.hidden = false; // Show buttons automatically in manual mode
-    currentCategoryStr = null;
+    calibrationPanel.hidden = false;
   } else {
-    calibrationPanel.hidden = true; // Hide buttons when AI is back on
+    currentAppMode = 'stylist';
+    toggleModeButton.textContent = 'Switch to Calibration';
+    recommendationCard.hidden = false;
+    calibrationPanel.hidden = true;
   }
-});
-
-toggleCalButton.addEventListener('click', () => {
-  calibrationPanel.hidden = !calibrationPanel.hidden;
 });
 
 document.querySelector('#backToApp').addEventListener('click', () => { window.location.hash = ''; });
@@ -670,15 +663,17 @@ function drawGlasses(ctx, landmarks, matrix, w, h) {
     const angleR = getAngle(p361, p454, p152)
     const jawAngle = (angleL + angleR) / 2
 
-    // Step 3: Classification (Only if Auto Detection is enabled)
-    if (!isAutoDetectionEnabled) {
+    // Step 3: Classification Logic
+    if (currentAppMode === 'calibration') {
+       calStatus.style.color = 'var(--accent)';
+       calStatus.textContent = `Live: Angle ${jawAngle.toFixed(0)}° | H/W ${(heightUnits/widthUnits).toFixed(2)}`;
        recommendationCard.hidden = true;
        return;
     }
 
-    console.log(`--- Metrics: Angle=${jawAngle.toFixed(2)}, H=${heightUnits.toFixed(2)}, J=${jawUnits.toFixed(2)}, W=${widthUnits.toFixed(2)} ---`)
+    recommendationCard.hidden = false;
     
-    // Store for calibration
+    // Store for calibration record (even in stylist mode)
     currentMetrics = {
       angle: jawAngle,
       h: heightUnits,
