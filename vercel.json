@@ -13,5 +13,11 @@
         }
       ]
     }
+  ],
+  "rewrites": [
+    {
+      "source": "/calibration_data.json",
+      "destination": "/api/get-calibration-data"
+    }
   ]
 }
