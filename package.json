@@ -14,7 +14,7 @@
     "vite-plugin-compression": "^0.5.1"
   },
   "dependencies": {
-    "@mediapipe/tasks-vision": "0.10.20",
+    "@mediapipe/tasks-vision": "0.10.14",
     "@vercel/kv": "^1.0.1",
     "ioredis": "^5.4.1"
   }
