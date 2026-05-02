@@ -494,7 +494,7 @@ function drawGlasses(ctx, landmarks, matrix, w, h) {
     const jawAngle = (angleL + angleR) / 2
 
     // Step 3: Classification
-    console.log(`Angle: ${jawAngle.toFixed(2)} H: ${heightUnits.toFixed(2)} J: ${jawUnits.toFixed(2)}`)
+    console.log('Angle:', jawAngle.toFixed(2), 'H:', heightUnits.toFixed(2), 'J:', jawUnits.toFixed(2))
     
     let bestShape = 'Oval'
     if (heightUnits > 3.15) {
@@ -506,6 +506,7 @@ function drawGlasses(ctx, landmarks, matrix, w, h) {
     } else if (heightUnits >= 2.9 && heightUnits <= 3.15 && jawAngle >= 155 && jawAngle <= 162) {
       bestShape = 'Oval'
     } else {
+      // Fallback: strictly following the Oval range, others default to Rounded if short or Oval if not
       bestShape = heightUnits < 2.9 ? 'Rounded' : 'Oval'
     }
 
