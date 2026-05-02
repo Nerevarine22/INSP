@@ -681,83 +681,71 @@ function drawGlasses(ctx, landmarks, matrix, w, h) {
       w: widthUnits
     };
 
-    let bestShape = 'Oval'
-    
-    // 1. Elongated (Long face)
-    if (heightUnits > 3.3) {
-      bestShape = 'Elongated'
+    // Step 4: Classification Logic (User-Defined Weights)
+    let bestShape = 'Oval';
+
+    // 1. Rounded: Width > 2.7, Jaw 2.4-2.6, Height 2.8-3.2, Angle 137-145
+    if (widthUnits > 2.7 && jawUnits > 2.4 && heightUnits > 2.7) {
+      bestShape = 'Rounded';
     } 
-    // 2. Angular Dominance (Jaw is wider than cheekbones)
-    else if (jawUnits >= widthUnits * 1.02) {
-      console.log('Angular trigger: Jaw Dominance')
-      bestShape = 'Angular'
+    // 2. Elongated: Height > 2.95, Width 2.1-2.4, Jaw 2.0-2.2, Angle 142-149
+    else if (heightUnits > 2.95 && widthUnits < 2.45) {
+      bestShape = 'Elongated';
     }
-    // 3. Angular (Sharp Jaw)
-    else if (jawAngle < 138) {
-      console.log('Angular trigger: Sharp Jaw')
-      bestShape = 'Angular'
+    // 3. Angular: Angle < 141, Jaw > 2.3, Width 2.4-2.6, Height 2.8-3.0
+    else if (jawAngle < 141 && jawUnits > 2.3) {
+      bestShape = 'Angular';
     }
-    // 4. Rounded (Wide face + smooth jaw line)
-    else if (jawAngle > 146 && widthUnits > 2.6) {
-      bestShape = 'Rounded'
+    // 4. Oval: Angle > 145, Width 2.2-2.4, Jaw 1.9-2.2, Height 2.6-2.9
+    else if (jawAngle > 145 || (heightUnits < 2.9 && widthUnits < 2.4)) {
+      bestShape = 'Oval';
     }
-    // 5. Oval (The calibrated window)
-    else if (heightUnits >= 2.6 && heightUnits <= 3.2 && jawAngle >= 138 && jawAngle <= 148) {
-      bestShape = 'Oval'
-    } 
+    // Fallback based on Angle if no clear match
     else {
-      // Fallback
-      bestShape = heightUnits < 2.6 ? 'Rounded' : 'Oval'
+      if (jawAngle < 141) bestShape = 'Angular';
+      else if (widthUnits > 2.6) bestShape = 'Rounded';
+      else bestShape = 'Oval';
     }
 
-    // Add to buffer for stabilization of the classification
-    if (faceMetricsBuffer.length >= MAX_METRICS_BUFFER) faceMetricsBuffer.shift()
-    faceMetricsBuffer.push(bestShape)
+    // Add to buffer for stabilization
+    if (faceMetricsBuffer.length >= MAX_METRICS_BUFFER) faceMetricsBuffer.shift();
+    faceMetricsBuffer.push(bestShape);
 
-    // Determine the most frequent shape in buffer
-    const counts = faceMetricsBuffer.reduce((acc, shape) => {
-      acc[shape] = (acc[shape] || 0) + 1
-      return acc
-    }, {})
-    
-    currentShapeKey = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b)
+    const counts = faceMetricsBuffer.reduce((acc, shape) => { acc[shape] = (acc[shape] || 0) + 1; return acc; }, {});
+    currentShapeKey = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
 
-    let category, advice
-    let recommendedModels = []
+    let category, advice, recommendedModels = [];
 
     if (currentShapeKey === 'Elongated') {
-      category = 'Elongated (Подовжене)'
-      advice = 'Обличчя витягнуте: обирайте виключно великі оправи (Oversized, Авіатори).'
-      recommendedModels = ['Aviator (Авіатори)', 'Oversized', 'Wayfarer']
+      category = 'Elongated (Подовжене)';
+      advice = 'Обличчя витягнуте: обирайте великі оправи, щоб візуально вкоротити обличчя.';
+      recommendedModels = ['Aviator', 'Oversized', 'Wayfarer'];
     } else if (currentShapeKey === 'Angular') {
-      category = 'Angular (Квадратне/Гостре)'
-      advice = 'Виражені кути щелепи: пом\'якшуйте лінію обличчя коло/овалом.'
-      recommendedModels = ['Round (Круглі)', 'Oval (Овальні)', 'Panto']
+      category = 'Angular (Квадратне/Гостре)';
+      advice = 'Виражені кути: пом\'якшуйте їх за допомогою круглих або овальних оправ.';
+      recommendedModels = ['Round', 'Oval', 'Panto'];
     } else if (currentShapeKey === 'Rounded') {
-      category = 'Rounded (Кругле/Серце)'
-      advice = 'Плавні лінії обличчя: додайте кутів за допомогою прямокутних оправ.'
-      recommendedModels = ['Square (Квадратні)', 'Rectangular (Прямокутні)', 'Cat-eye (Котяче око)']
+      category = 'Rounded (Кругле)';
+      advice = 'Плавні лінії: додайте характеру за допомогою прямокутних оправ.';
+      recommendedModels = ['Square', 'Rectangular', 'Cat-eye'];
     } else {
-      category = 'Oval (Універсальне/Еталон)'
-      advice = 'Ідеальні пропорції: вам підійде більшість оправ. Експериментуйте з формами!'
-      recommendedModels = ['Aviator (Авіатори)', 'Wayfarer', 'Cat-eye (Котяче око)', 'Round (Круглі)']
+      category = 'Oval (Овальне)';
+      advice = 'Ідеальний баланс: вам підійде майже будь-яка форма!';
+      recommendedModels = ['Aviator', 'Wayfarer', 'Cat-eye', 'Round'];
     }
 
-    let models = recommendedModels.join(', ')
-
     if (category !== currentCategoryStr) {
-      currentCategoryStr = category
-      faceShapeCategory.textContent = 'Analyzing...'
-      recBody.hidden = true
-      
-      if (shapeDetectTimeout) clearTimeout(shapeDetectTimeout)
-      
+      currentCategoryStr = category;
+      faceShapeCategory.textContent = 'Analyzing...';
+      recBody.hidden = true;
+      if (shapeDetectTimeout) clearTimeout(shapeDetectTimeout);
       shapeDetectTimeout = setTimeout(() => {
-        faceShapeCategory.textContent = category
-        faceShapeAdvice.textContent = advice
-        faceShapeModels.textContent = models
-        recBody.hidden = false
-      }, 2000)
+        faceShapeCategory.textContent = category;
+        faceShapeAdvice.textContent = advice;
+        faceShapeModels.textContent = recommendedModels.join(', ');
+        recBody.hidden = false;
+        recommendationCard.hidden = false;
+      }, 1500);
     }
   }
 
