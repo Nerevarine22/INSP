@@ -1,6 +1,18 @@
 import { kv } from '@vercel/kv';
 
 export default async function handler(req, res) {
+  // Debug environment variables (without revealing tokens)
+  const hasUrl = !!process.env.KV_REST_API_URL;
+  const hasToken = !!process.env.KV_REST_API_TOKEN;
+
+  if (!hasUrl || !hasToken) {
+    return res.status(500).json({ 
+      error: 'KV Environment variables missing', 
+      details: { hasUrl, hasToken },
+      note: 'Please ensure KV is connected in Vercel Storage settings and you have redeployed.'
+    });
+  }
+
   if (req.method === 'POST') {
     try {
       const newData = req.body;
