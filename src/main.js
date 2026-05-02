@@ -71,9 +71,11 @@ app.innerHTML = `
             </div>
           </div>
 
-          <div class="bottom-actions">
-            <button id="toggleModeButton" class="primary-button" style="flex: 2;">Switch to Calibration</button>
-            <a href="#stats" id="statsLink" class="secondary-button" style="flex: 1;">Stats</a>
+          <div class="bottom-actions mode-nav">
+            <button class="nav-btn active" data-mode="tryon">Try-On</button>
+            <button class="nav-btn" data-mode="stylist">AI Stylist</button>
+            <button class="nav-btn" data-mode="calibration">Data</button>
+            <a href="#stats" id="statsLink" class="nav-btn-stats">Stats</a>
           </div>
         </div>
 
@@ -353,7 +355,6 @@ startButton.addEventListener('click', startExperience)
 const mainViewer = document.querySelector('#mainViewer');
 const statsPanel = document.querySelector('#statsPanel');
 const calibrationPanel = document.querySelector('#calibrationPanel');
-const toggleModeButton = document.querySelector('#toggleModeButton');
 const calStatus = document.querySelector('#calStatus');
 const statsTableBody = document.querySelector('#statsTable tbody');
 
@@ -367,25 +368,35 @@ function syncRoute() {
     statsPanel.style.display = 'none';
   }
 }
-
 window.addEventListener('hashchange', syncRoute);
 syncRoute();
 
-let currentAppMode = 'stylist'; // 'stylist' or 'calibration'
+const navButtons = document.querySelectorAll('.nav-btn');
+const panels = {
+  tryon: document.querySelector('#frameGallery'),
+  stylist: document.querySelector('#recommendationCard'),
+  calibration: document.querySelector('#calibrationPanel')
+};
 
-toggleModeButton.addEventListener('click', () => {
-  if (currentAppMode === 'stylist') {
-    currentAppMode = 'calibration';
-    toggleModeButton.textContent = 'Switch to Stylist';
-    recommendationCard.hidden = true;
-    calibrationPanel.hidden = false;
-  } else {
-    currentAppMode = 'stylist';
-    toggleModeButton.textContent = 'Switch to Calibration';
-    recommendationCard.hidden = false;
-    calibrationPanel.hidden = true;
-  }
+let currentAppMode = 'tryon';
+
+function switchMode(newMode) {
+  currentAppMode = newMode;
+  navButtons.forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-mode') === newMode);
+  });
+  Object.keys(panels).forEach(key => {
+    if (panels[key]) {
+      panels[key].hidden = (key !== newMode);
+    }
+  });
+}
+
+navButtons.forEach(btn => {
+  btn.addEventListener('click', () => switchMode(btn.getAttribute('data-mode')));
 });
+
+switchMode('tryon');
 
 document.querySelector('#backToApp').addEventListener('click', () => { window.location.hash = ''; });
 document.querySelector('#refreshStats').addEventListener('click', loadStats);
