@@ -12,14 +12,16 @@ app.innerHTML = `
         <div class="overlay top-overlay">
           <div class="status-pill">
             <span class="status-dot" id="statusDot"></span>
-            <span id="statusText">Ready</span>
+            <span id="statusText">Ready to start camera</span>
           </div>
-          <button id="startButton" class="primary-button" type="button">
-            Start Experience
-          </button>
-          <button id="flipCameraButton" class="secondary-button" style="display: none;" type="button" aria-label="Flip Camera">
-            🔄
-          </button>
+          <div style="display: flex; gap: 8px;">
+            <button id="startButton" class="primary-button" type="button">
+              Start camera
+            </button>
+            <button id="flipCameraButton" class="secondary-button" style="font-size: 1.2rem; padding: 0.5rem 1rem;" type="button" aria-label="Flip Camera" hidden>
+              🔄
+            </button>
+          </div>
         </div>
 
         <div class="overlay bottom-overlay">
@@ -69,11 +71,9 @@ app.innerHTML = `
             </div>
           </div>
 
-          <div class="bottom-actions mode-nav">
-            <button class="nav-btn active" data-mode="tryon">Try-On</button>
-            <button class="nav-btn" data-mode="stylist">AI Stylist</button>
-            <button class="nav-btn" data-mode="calibration">Data</button>
-            <a href="#stats" id="statsLink" class="nav-btn-stats">Stats</a>
+          <div class="bottom-actions">
+            <button id="toggleModeButton" class="primary-button" style="flex: 2;">Switch to Calibration</button>
+            <a href="#stats" id="statsLink" class="secondary-button" style="flex: 1;">Stats</a>
           </div>
         </div>
 
@@ -142,6 +142,16 @@ let animationId = null
 let lastVideoTime = -1
 let currentFacingMode = 'user'
 
+// Frame Gallery Logic
+document.querySelectorAll('.frame-item').forEach(item => {
+  item.addEventListener('click', () => {
+    document.querySelectorAll('.frame-item').forEach(f => f.classList.remove('active'));
+    item.classList.add('active');
+    const newSrc = item.getAttribute('data-src');
+    glassesImg.src = newSrc;
+  });
+});
+
 // Calibration State
 let currentMetrics = null;
 let savedSamplesCount = 0;
@@ -193,17 +203,7 @@ function getMedian(arr) {
 }
 
 const glassesImg = new Image()
-glassesImg.src = '/glasses.svg'
-
-// Frame Selection Logic
-document.querySelectorAll('.frame-item').forEach(item => {
-  item.addEventListener('click', () => {
-    document.querySelectorAll('.frame-item').forEach(f => f.classList.remove('active'));
-    item.classList.add('active');
-    const newSrc = item.getAttribute('data-src');
-    glassesImg.src = newSrc;
-  });
-});
+glassesImg.src = '/pngwing.com.png'
 
 // EMA Smoothing state
 let smoothedPos = { x: 0, y: 0, w: 0, roll: 0, pitch: 0, yaw: 0 }
@@ -353,6 +353,7 @@ startButton.addEventListener('click', startExperience)
 const mainViewer = document.querySelector('#mainViewer');
 const statsPanel = document.querySelector('#statsPanel');
 const calibrationPanel = document.querySelector('#calibrationPanel');
+const toggleModeButton = document.querySelector('#toggleModeButton');
 const calStatus = document.querySelector('#calStatus');
 const statsTableBody = document.querySelector('#statsTable tbody');
 
@@ -366,35 +367,25 @@ function syncRoute() {
     statsPanel.style.display = 'none';
   }
 }
+
 window.addEventListener('hashchange', syncRoute);
 syncRoute();
 
-const navButtons = document.querySelectorAll('.nav-btn');
-const panels = {
-  tryon: document.querySelector('#frameGallery'),
-  stylist: document.querySelector('#recommendationCard'),
-  calibration: document.querySelector('#calibrationPanel')
-};
+let currentAppMode = 'stylist'; // 'stylist' or 'calibration'
 
-let currentAppMode = 'tryon';
-
-function switchMode(newMode) {
-  currentAppMode = newMode;
-  navButtons.forEach(btn => {
-    btn.classList.toggle('active', btn.getAttribute('data-mode') === newMode);
-  });
-  Object.keys(panels).forEach(key => {
-    if (panels[key]) {
-      panels[key].hidden = (key !== newMode);
-    }
-  });
-}
-
-navButtons.forEach(btn => {
-  btn.addEventListener('click', () => switchMode(btn.getAttribute('data-mode')));
+toggleModeButton.addEventListener('click', () => {
+  if (currentAppMode === 'stylist') {
+    currentAppMode = 'calibration';
+    toggleModeButton.textContent = 'Switch to Stylist';
+    recommendationCard.hidden = true;
+    calibrationPanel.hidden = false;
+  } else {
+    currentAppMode = 'stylist';
+    toggleModeButton.textContent = 'Switch to Calibration';
+    recommendationCard.hidden = false;
+    calibrationPanel.hidden = true;
+  }
 });
-
-switchMode('tryon');
 
 document.querySelector('#backToApp').addEventListener('click', () => { window.location.hash = ''; });
 document.querySelector('#refreshStats').addEventListener('click', loadStats);
