@@ -681,36 +681,47 @@ function drawGlasses(ctx, landmarks, matrix, w, h) {
       w: widthUnits
     };
 
-    // Step 4: Classification Logic (Balanced Delta)
-    let bestShape = 'Oval';
+    // Step 4: Classification Logic (Scoring System)
+    const ratioHW = heightUnits / widthUnits;
     const diffWJ = widthUnits - jawUnits;
+    
+    const scores = {
+      Oval: 0,
+      Rounded: 0,
+      Angular: 0,
+      Elongated: 0
+    };
 
-    // Priority 1: Elongated
-    if (heightUnits > 2.95 && widthUnits < 2.5) {
-      bestShape = 'Elongated';
-    } 
-    // Priority 2: Very Sharp Angle (< 136 deg)
-    else if (jawAngle < 136) {
-      bestShape = 'Angular';
+    // --- Feature 1: Height/Width Ratio ---
+    if (ratioHW > 1.26) scores.Elongated += 4;
+    else if (ratioHW > 1.16 && ratioHW <= 1.26) scores.Oval += 2;
+    else scores.Rounded += 2;
+
+    // --- Feature 2: Jaw Angle ---
+    if (jawAngle < 137) scores.Angular += 4;
+    else if (jawAngle >= 137 && jawAngle < 142) {
+      scores.Angular += 1;
+      scores.Rounded += 2;
     }
-    // Priority 3: The 'Deciding Vote' (Balanced)
-    else if (diffWJ > 0.10) {
-      // Cheekbones clearly wider -> Rounded
-      bestShape = 'Rounded';
-    }
-    else if (diffWJ < 0.07) {
-      // Jaw is almost the same width as cheekbones -> Angular
-      bestShape = 'Angular';
-    }
-    // Priority 4: Standard Ranges
-    else if (jawAngle > 144 && heightUnits < 2.9) {
-      bestShape = 'Oval';
-    }
+    else scores.Oval += 3;
+
+    // --- Feature 3: Width-Jaw Delta ---
+    if (diffWJ > 0.14) scores.Rounded += 4;
+    else if (diffWJ < 0.07) scores.Angular += 4;
     else {
-      // Default fallback
-      if (widthUnits > 2.62) bestShape = 'Rounded';
-      else bestShape = 'Oval';
+      scores.Oval += 2;
+      scores.Elongated += 1;
     }
+
+    // --- Feature 4: Absolute Width ---
+    if (widthUnits > 2.65) scores.Rounded += 2;
+    if (widthUnits < 2.35) scores.Elongated += 2;
+
+    // Determine the winner
+    let bestShape = Object.keys(scores).reduce((a, b) => scores[a] > scores[b] ? a : b);
+    
+    // Tie-breaker or subtle bias
+    if (scores[bestShape] < 3) bestShape = 'Oval'; 
 
     // Add to buffer for stabilization
     if (faceMetricsBuffer.length >= MAX_METRICS_BUFFER) faceMetricsBuffer.shift();
