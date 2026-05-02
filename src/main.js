@@ -66,7 +66,7 @@ function load3DModel(path) {
     const center = box.getCenter(new THREE.Vector3())
     
     current3DModel.position.sub(center) // Center the model
-    current3DModel.position.z = 0.2      // Adjusted Z-position to sit safely in front of the head
+    current3DModel.position.z = -0.05    // Seat it deeper on the nose bridge
     
     // Normalize size (assuming 1.8 units is a good width)
     const scale = 1.8 / size.x
@@ -239,7 +239,7 @@ function update3D(landmarks, matrix) {
   const p263 = landmarks[263]
   const eyeDist = Math.sqrt(Math.pow(p33.x - p263.x, 2) + Math.pow(p33.y - p263.y, 2))
   
-  // Scale reduced to 2.1
-  const s = eyeDist * 2.1 
+  // Scale increased to 2.45 for better fit
+  const s = eyeDist * 2.45
   faceGroup.scale.set(s, s, s)
 }
