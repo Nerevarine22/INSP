@@ -197,30 +197,49 @@ function loop() {
   if (!isTracking) return
   const now = performance.now()
   const results = faceLandmarker.detectForVideo(video, now)
+  
   if (results.faceLandmarks && results.faceLandmarks.length > 0) {
-    update3D(results.faceLandmarks[0], results.facialTransformationMatrixes[0])
+    update3D(results.faceLandmarks[0], results.facialTransformationMatrixes ? results.facialTransformationMatrixes[0] : null)
   } else {
     faceGroup.visible = false
   }
+  
   renderer.render(scene, camera)
   requestAnimationFrame(loop)
 }
 
 function update3D(landmarks, matrix) {
   faceGroup.visible = true
+  
+  // Landmark 6: Nose Bridge (Center of glasses)
+  const p6 = landmarks[6]
+  
+  // Convert normalized [0, 1] to Three.js space [-aspect, aspect]
+  const aspect = window.innerWidth / window.innerHeight
+  // Viewport size at z=0 for FOV 45 and camera.z=5 is ~4.14
+  const vH = 2 * Math.tan((45 * Math.PI / 180) / 2) * 5
+  const vW = vH * aspect
+
+  // Position
+  const tx = (0.5 - p6.x) * vW  // Inverted X for mirror
+  const ty = (0.5 - p6.y) * vH
+  faceGroup.position.set(tx, ty, 0)
+
+  // Rotation from matrix or landmarks
   if (matrix) {
     const m = new THREE.Matrix4().fromArray(matrix.data)
-    const position = new THREE.Vector3(), quaternion = new THREE.Quaternion(), scale = new THREE.Vector3()
-    m.decompose(position, quaternion, scale)
-    
-    // Improved coordinate mapping for AR
-    // We map normalized landmark coordinates to Three.js units
-    faceGroup.position.set(-position.x / 10, -position.y / 10, -position.z / 35)
-    faceGroup.quaternion.copy(quaternion)
+    const pos = new THREE.Vector3(), quat = new THREE.Quaternion(), scl = new THREE.Vector3()
+    m.decompose(pos, quat, scl)
+    faceGroup.quaternion.copy(quat)
   }
+
+  // Scale: Distance between eye corners (33 and 263)
+  const p33 = landmarks[33]
+  const p263 = landmarks[263]
+  const eyeDist = Math.sqrt(Math.pow(p33.x - p263.x, 2) + Math.pow(p33.y - p263.y, 2))
   
-  // Nose Unit Scaling
-  const u = Math.sqrt(Math.pow(landmarks[8].x - landmarks[2].x, 2) + Math.pow(landmarks[8].y - landmarks[2].y, 2))
-  const s = u * 110 // Stable scaling factor
+  // A standard face width is ~0.4 normalized units. 
+  // We scale the model (which we normalized to 1.8 units) to fit the eye distance.
+  const s = eyeDist * 8.5 // Fine-tuned multiplier for 3D units
   faceGroup.scale.set(s, s, s)
 }
