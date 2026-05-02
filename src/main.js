@@ -12,16 +12,14 @@ app.innerHTML = `
         <div class="overlay top-overlay">
           <div class="status-pill">
             <span class="status-dot" id="statusDot"></span>
-            <span id="statusText">Ready to start camera</span>
+            <span id="statusText">Ready</span>
           </div>
-          <div style="display: flex; gap: 8px;">
-            <button id="startButton" class="primary-button" type="button">
-              Start camera
-            </button>
-            <button id="flipCameraButton" class="secondary-button" style="font-size: 1.2rem; padding: 0.5rem 1rem;" type="button" aria-label="Flip Camera" hidden>
-              🔄
-            </button>
-          </div>
+          <button id="startButton" class="primary-button" type="button">
+            Start Experience
+          </button>
+          <button id="flipCameraButton" class="secondary-button" style="display: none;" type="button" aria-label="Flip Camera">
+            🔄
+          </button>
         </div>
 
         <div class="overlay bottom-overlay">
