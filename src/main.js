@@ -113,6 +113,15 @@ function pointToLineDist(pt, lineStart, lineEnd) {
   return den === 0 ? 0 : num / den
 }
 
+function getAngle(pCenter, p1, p2) {
+  const v1 = { x: p1.x - pCenter.x, y: p1.y - pCenter.y }
+  const v2 = { x: p2.x - pCenter.x, y: p2.y - pCenter.y }
+  const dot = v1.x * v2.x + v1.y * v2.y
+  const mag1 = Math.sqrt(v1.x * v1.x + v1.y * v1.y)
+  const mag2 = Math.sqrt(v2.x * v2.x + v2.y * v2.y)
+  return Math.acos(dot / (mag1 * mag2)) * (180 / Math.PI)
+}
+
 function getMedian(arr) {
   if (arr.length === 0) return 0
   const sorted = [...arr].sort((a, b) => a - b)
@@ -479,21 +488,23 @@ function drawGlasses(ctx, landmarks, matrix, w, h) {
     const bezierOffsetPx = pointToLineDist(p132, p234, p152)
     const bezierOffset = bezierOffsetPx / U
 
+    // Jaw Angle
+    const angleL = getAngle(p132, p234, p152)
+    const angleR = getAngle(p361, p454, p152)
+    const jawAngle = (angleL + angleR) / 2
+
     // Step 3: Classification
-    console.log(`H: ${heightUnits.toFixed(2)} W: ${widthUnits.toFixed(2)} J: ${jawUnits.toFixed(2)}`)
+    console.log(`H: ${heightUnits.toFixed(2)} W: ${widthUnits.toFixed(2)} J: ${jawUnits.toFixed(2)} Angle: ${jawAngle.toFixed(2)}`)
     
     let bestShape = 'Oval'
-    if (heightUnits > 3.15) {
+    if (heightUnits > 3.2) {
       bestShape = 'Elongated'
-    } else if (jawUnits > 2.75 && bezierOffset > 0.10) {
+    } else if (jawAngle < 150 && jawUnits > 2.7) {
       bestShape = 'Angular'
-    } else if (widthUnits > jawUnits * 1.1 && heightUnits < 3.1) {
+    } else if (widthUnits > 3.1 && jawAngle > 155) {
       bestShape = 'Rounded'
-    } else if (heightUnits >= 2.9 && heightUnits <= 3.1) {
-      bestShape = 'Oval'
     } else {
-      // Fallback for edge cases outside the strict Oval window
-      bestShape = heightUnits < 2.9 ? 'Rounded' : 'Elongated'
+      bestShape = 'Oval'
     }
 
     // Add to buffer for stabilization of the classification
