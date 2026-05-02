@@ -626,8 +626,7 @@ function drawGlasses(ctx, landmarks, matrix, w, h) {
   const anchorX = smoothedPos.x
   const anchorY = smoothedPos.y - yOffset
 
-  // ─── Draw Temples (Arms) ───
-  // We need to match screen-left frame edge with screen-left ear
+  // ─── Draw Temples (Arms) with Perspective ───
   const p1 = {
     x: (flipX ? (1 - landmarks[127].x) : landmarks[127].x) * w,
     y: landmarks[127].y * h
@@ -637,21 +636,21 @@ function drawGlasses(ctx, landmarks, matrix, w, h) {
     y: landmarks[389].y * h
   }
 
-  // Sort by X to find which is screen-left and screen-right
   const pScreenL = p1.x < p2.x ? p1 : p2
   const pScreenR = p1.x < p2.x ? p2 : p1
 
-  const drawTemple = (startX, startY, endX, endY) => {
+  const drawTemple = (startX, startY, endX, endY, isVisible) => {
+    if (!isVisible) return;
     ctx.save()
     const grad = ctx.createLinearGradient(startX, startY, endX, endY)
-    grad.addColorStop(0, 'rgba(40, 40, 40, 1)')
-    grad.addColorStop(0.8, 'rgba(40, 40, 40, 0.4)')
-    grad.addColorStop(1, 'rgba(40, 40, 40, 0)')
+    grad.addColorStop(0, 'rgba(25, 25, 25, 1)')
+    grad.addColorStop(0.8, 'rgba(25, 25, 25, 0.4)')
+    grad.addColorStop(1, 'rgba(25, 25, 25, 0)')
     ctx.beginPath()
     ctx.strokeStyle = grad
-    ctx.lineWidth = smoothedPos.w * 0.04
+    ctx.lineWidth = smoothedPos.w * 0.035
     ctx.lineCap = 'round'
-    ctx.shadowBlur = 8
+    ctx.shadowBlur = 6
     ctx.shadowColor = 'rgba(0,0,0,0.5)'
     ctx.moveTo(startX, startY)
     ctx.lineTo(endX, endY)
@@ -659,20 +658,25 @@ function drawGlasses(ctx, landmarks, matrix, w, h) {
     ctx.restore()
   }
 
-  // Frame outer edges on screen
-  const halfW = (smoothedPos.w / 2) * Math.cos(smoothedPos.yaw)
+  // Calculate frame edges with extra margin for temples
+  const templeSpread = 0.95 // adjustment factor
+  const halfW = (smoothedPos.w / 2) * Math.cos(smoothedPos.yaw) * templeSpread
   const cosR = Math.cos(smoothedPos.roll)
   const sinR = Math.sin(smoothedPos.roll)
 
-  // fLx is screen-left edge, fRx is screen-right edge
   const fLx = anchorX - halfW * cosR
   const fLy = anchorY - halfW * sinR
   const fRx = anchorX + halfW * cosR
   const fRy = anchorY + halfW * sinR
 
-  // Connect screen-left to screen-left, screen-right to screen-right
-  drawTemple(fLx, fLy, pScreenL.x, pScreenL.y)
-  drawTemple(fRx, fRy, pScreenR.x, pScreenR.y)
+  // Visibility logic based on yaw (rotation)
+  // yaw > 0 means turning right (in mirrored view, left temple becomes visible)
+  // We use a small threshold to avoid flickering
+  const showLeftTemple = (smoothedPos.yaw > -0.1)
+  const showRightTemple = (smoothedPos.yaw < 0.1)
+
+  drawTemple(fLx, fLy, pScreenL.x, pScreenL.y, showLeftTemple)
+  drawTemple(fRx, fRy, pScreenR.x, pScreenR.y, showRightTemple)
 
   // ─── Draw Main Frame ───
   ctx.translate(anchorX, anchorY)
