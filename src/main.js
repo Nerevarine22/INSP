@@ -25,7 +25,16 @@ app.innerHTML = `
         </div>
 
         <div class="overlay bottom-overlay">
-          <!-- AI Stylist Removed -->
+          <!-- AI Stylist Card (Restored) -->
+          <div class="recommendation-card" id="recommendationCard" hidden>
+            <div class="rec-header">
+              <span class="metric-label">Smart Stylist: <strong id="faceShapeCategory" style="color: var(--accent);">Analyzing...</strong></span>
+            </div>
+            <div class="rec-body" id="recBody" hidden>
+              <p class="rec-advice" id="faceShapeAdvice"></p>
+              <p class="rec-models"><strong>Моделі:</strong> <span id="faceShapeModels"></span></p>
+            </div>
+          </div>
           
           <!-- Calibration Controls -->
           <div class="calibration-panel" id="calibrationPanel" hidden>
@@ -36,23 +45,11 @@ app.innerHTML = `
                 <button class="cal-btn" data-shape="Rounded">Rounded</button>
                 <button class="cal-btn" data-shape="Oval">Oval</button>
              </div>
-             <p class="calibration-status" id="calStatus">No samples yet</p>
-          </div>
-
-          <!-- Metrics (hidden but needed for stability) -->
-          <div class="metrics-row" style="display: none;">
-            <div class="metric-card">
-              <span class="metric-label">Tracking</span>
-              <strong id="trackingValue">Waiting</strong>
-            </div>
-            <div class="metric-card">
-              <span class="metric-label">Rotation</span>
-              <strong id="rotationValue">0 deg, 0 deg, 0 deg</strong>
-            </div>
+             <p class="calibration-status" id="calStatus">Ready for capture</p>
           </div>
 
           <div class="bottom-actions">
-            <button id="toggleCalButton" class="primary-button" style="flex: 2;">Record Face Data</button>
+            <button id="toggleModeButton" class="primary-button" style="flex: 2;">Switch to Calibration</button>
             <a href="#stats" id="statsLink" class="secondary-button" style="flex: 1;">Stats</a>
           </div>
         </div>
@@ -109,6 +106,12 @@ const loadingOverlay  = document.querySelector('#loadingOverlay')
 const loadingBar      = document.querySelector('#loadingBar')
 const loadingLabel    = document.querySelector('#loadingLabel')
 const yOffsetSlider   = document.querySelector('#yOffsetSlider')
+const recommendationCard = document.querySelector('#recommendationCard')
+const faceShapeCategory  = document.querySelector('#faceShapeCategory')
+const recBody            = document.querySelector('#recBody')
+const faceShapeAdvice    = document.querySelector('#faceShapeAdvice')
+const faceShapeModels    = document.querySelector('#faceShapeModels')
+const toggleModeButton   = document.querySelector('#toggleModeButton')
 
 let isInitializing = false
 let isTracking = false
@@ -125,7 +128,6 @@ let savedSamplesCount = 0;
 let shapeDetectTimeout = null
 let currentCategoryStr = null
 let currentShapeKey = null
-let isAutoDetectionEnabled = true
 const faceMetricsBuffer = []
 const MAX_METRICS_BUFFER = 15
 
@@ -336,8 +338,20 @@ function syncRoute() {
 window.addEventListener('hashchange', syncRoute);
 syncRoute();
 
-toggleCalButton.addEventListener('click', () => {
-  calibrationPanel.hidden = !calibrationPanel.hidden;
+let currentAppMode = 'stylist'; // 'stylist' or 'calibration'
+
+toggleModeButton.addEventListener('click', () => {
+  if (currentAppMode === 'stylist') {
+    currentAppMode = 'calibration';
+    toggleModeButton.textContent = 'Switch to Stylist';
+    recommendationCard.hidden = true;
+    calibrationPanel.hidden = false;
+  } else {
+    currentAppMode = 'stylist';
+    toggleModeButton.textContent = 'Switch to Calibration';
+    recommendationCard.hidden = false;
+    calibrationPanel.hidden = true;
+  }
 });
 
 document.querySelector('#backToApp').addEventListener('click', () => { window.location.hash = ''; });
@@ -485,14 +499,16 @@ function renderLoop() {
       drawGlasses(ctx, landmarks, matrix, canvas.width, canvas.height)
     } else {
       currentCategoryStr = null;
-      currentMetrics = null; // IMPORTANT: Prevent saving invalid data
+      currentMetrics = null; 
       faceMetricsBuffer.length = 0;
       uBuffer.length = 0;
       if (shapeDetectTimeout) clearTimeout(shapeDetectTimeout);
 
-      if (!calibrationPanel.hidden) {
+      if (currentAppMode === 'calibration') {
         calStatus.style.color = 'var(--warning)';
         calStatus.textContent = "⚠️ Position face in frame...";
+      } else {
+        recommendationCard.hidden = true;
       }
     }
   }
@@ -639,7 +655,7 @@ function drawGlasses(ctx, landmarks, matrix, w, h) {
     const angleR = getAngle(p361, p454, p152)
     const jawAngle = (angleL + angleR) / 2
 
-    // Step 3: Collect Metrics for Calibration
+    // Step 3: Collect Metrics
     currentMetrics = {
       angle: jawAngle,
       h: heightUnits,
@@ -647,9 +663,74 @@ function drawGlasses(ctx, landmarks, matrix, w, h) {
       w: widthUnits
     };
 
-    if (!calibrationPanel.hidden) {
+    // Live Metrics for Calibration Mode
+    if (currentAppMode === 'calibration') {
       calStatus.style.color = 'var(--accent)';
-      calStatus.textContent = `Live: Angle ${jawAngle.toFixed(0)}° | H ${heightUnits.toFixed(2)}U`;
+      calStatus.textContent = `Live: Angle ${jawAngle.toFixed(0)}° | H/W ${(heightUnits/widthUnits).toFixed(2)}`;
+      return; // Skip classification UI in calibration mode
+    }
+
+    // Step 4: Classification Logic (NEW RATIO-BASED)
+    const hwRatio = heightUnits / widthUnits;
+    const jwRatio = jawUnits / widthUnits;
+    let bestShape = 'Oval';
+
+    // 1. Elongated (Based on H/W Ratio > 1.23)
+    if (hwRatio > 1.23) {
+      bestShape = 'Elongated';
+    } 
+    // 2. Angular (Sharp Angle < 137°)
+    else if (jawAngle < 137) {
+      bestShape = 'Angular';
+    }
+    // 3. Rounded (Wide face W > 2.65)
+    else if (widthUnits > 2.65 && jawAngle > 138) {
+      bestShape = 'Rounded';
+    }
+    // 4. Oval (Balanced)
+    else {
+      bestShape = 'Oval';
+    }
+
+    // Buffering & UI Updates
+    if (faceMetricsBuffer.length >= MAX_METRICS_BUFFER) faceMetricsBuffer.shift();
+    faceMetricsBuffer.push(bestShape);
+
+    const counts = faceMetricsBuffer.reduce((acc, shape) => { acc[shape] = (acc[shape] || 0) + 1; return acc; }, {});
+    currentShapeKey = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
+
+    let category, advice, recommendedModels = [];
+
+    if (currentShapeKey === 'Elongated') {
+      category = 'Elongated (Подовжене)';
+      advice = 'Обличчя витягнуте: обирайте великі оправи, щоб візуально вкоротити обличчя.';
+      recommendedModels = ['Aviator', 'Oversized', 'Wayfarer'];
+    } else if (currentShapeKey === 'Angular') {
+      category = 'Angular (Квадратне/Гостре)';
+      advice = 'Виражені кути: пом\'якшуйте їх за допомогою круглих або овальних оправ.';
+      recommendedModels = ['Round', 'Oval', 'Panto'];
+    } else if (currentShapeKey === 'Rounded') {
+      category = 'Rounded (Кругле)';
+      advice = 'Плавні лінії: додайте характеру за допомогою прямокутних оправ.';
+      recommendedModels = ['Square', 'Rectangular', 'Cat-eye'];
+    } else {
+      category = 'Oval (Овальне)';
+      advice = 'Ідеальний баланс: вам підійде майже будь-яка форма!';
+      recommendedModels = ['Aviator', 'Wayfarer', 'Cat-eye', 'Round'];
+    }
+
+    if (category !== currentCategoryStr) {
+      currentCategoryStr = category;
+      faceShapeCategory.textContent = 'Analyzing...';
+      recBody.hidden = true;
+      if (shapeDetectTimeout) clearTimeout(shapeDetectTimeout);
+      shapeDetectTimeout = setTimeout(() => {
+        faceShapeCategory.textContent = category;
+        faceShapeAdvice.textContent = advice;
+        faceShapeModels.textContent = recommendedModels.join(', ');
+        recBody.hidden = false;
+        recommendationCard.hidden = false;
+      }, 1500);
     }
   }
 }
