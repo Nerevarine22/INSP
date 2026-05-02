@@ -101,7 +101,7 @@ const MAX_METRICS_BUFFER = 15
 // 132, 361: Jaw angles (left/right)
 
 const uBuffer = []
-const MAX_U_BUFFER = 20
+const MAX_U_BUFFER = 10
 
 function getPointDist(p1, p2) {
   return Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2))
@@ -494,17 +494,19 @@ function drawGlasses(ctx, landmarks, matrix, w, h) {
     const jawAngle = (angleL + angleR) / 2
 
     // Step 3: Classification
-    console.log(`H: ${heightUnits.toFixed(2)} W: ${widthUnits.toFixed(2)} J: ${jawUnits.toFixed(2)} Angle: ${jawAngle.toFixed(2)}`)
+    console.log(`Angle: ${jawAngle.toFixed(2)} H: ${heightUnits.toFixed(2)} J: ${jawUnits.toFixed(2)}`)
     
     let bestShape = 'Oval'
-    if (heightUnits > 3.2) {
+    if (heightUnits > 3.15) {
       bestShape = 'Elongated'
-    } else if (jawAngle < 150 && jawUnits > 2.7) {
+    } else if (jawAngle < 155 && jawUnits > 2.7) {
       bestShape = 'Angular'
-    } else if (widthUnits > 3.1 && jawAngle > 155) {
+    } else if (jawAngle > 162 && widthUnits > 3.0) {
       bestShape = 'Rounded'
-    } else {
+    } else if (heightUnits >= 2.9 && heightUnits <= 3.15 && jawAngle >= 155 && jawAngle <= 162) {
       bestShape = 'Oval'
+    } else {
+      bestShape = heightUnits < 2.9 ? 'Rounded' : 'Oval'
     }
 
     // Add to buffer for stabilization of the classification
