@@ -31,6 +31,35 @@ body, html {
 }
 
 .top-overlay { top: 0; align-items: center; }
+.settings-panel {
+  background: var(--panel);
+  backdrop-filter: var(--glass);
+  padding: 15px;
+  border-radius: 20px;
+  border: 1px solid var(--panel-border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: auto;
+  margin-top: 10px;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.setting-row input {
+  flex: 1;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
 .bottom-overlay {
   bottom: 0; padding-bottom: 40px;
   background: linear-gradient(0deg, rgba(0,0,0,0.8) 0%, transparent 100%);

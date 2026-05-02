@@ -115,7 +115,23 @@ uiOverlay.innerHTML = `
             <button class="nav-btn active" data-mode="tryon">Try-On</button>
             <button class="nav-btn" data-mode="stylist">Stylist</button>
             <button class="nav-btn" data-mode="calibration">Data</button>
-            <a href="#stats" class="nav-btn-stats">📈</a>
+            <button id="toggleSettings" class="nav-btn-stats">⚙️</button>
+          </div>
+
+          <!-- Manual Tuning Panel -->
+          <div id="settingsPanel" class="settings-panel" hidden>
+            <div class="setting-row">
+              <label>Size</label>
+              <input type="range" id="sliderScale" min="0.5" max="2.0" step="0.05" value="1.0">
+            </div>
+            <div class="setting-row">
+              <label>Height</label>
+              <input type="range" id="sliderY" min="-1.0" max="1.0" step="0.05" value="0.0">
+            </div>
+            <div class="setting-row">
+              <label>Depth</label>
+              <input type="range" id="sliderZ" min="-1.0" max="1.0" step="0.05" value="0.0">
+            </div>
           </div>
         </div>
       </div>
@@ -130,6 +146,22 @@ uiOverlay.innerHTML = `
     </section>
   </main>
 `
+
+// Manual Tuning State
+let manualScale = 1.0
+let manualY = 0.0
+let manualZ = 0.0
+
+const settingsPanel = document.querySelector('#settingsPanel')
+const toggleSettings = document.querySelector('#toggleSettings')
+
+toggleSettings.addEventListener('click', () => {
+  settingsPanel.hidden = !settingsPanel.hidden
+})
+
+document.querySelector('#sliderScale').addEventListener('input', (e) => { manualScale = parseFloat(e.target.value) })
+document.querySelector('#sliderY').addEventListener('input', (e) => { manualY = parseFloat(e.target.value) })
+document.querySelector('#sliderZ').addEventListener('input', (e) => { manualZ = parseFloat(e.target.value) })
 
 // Selectors
 const video = document.querySelector('#videoElement')
@@ -211,35 +243,32 @@ function loop() {
 
 function update3D(landmarks, matrix) {
   faceGroup.visible = true
-  
   const p6 = landmarks[6]
   const aspect = window.innerWidth / window.innerHeight
   const vH = 2 * Math.tan((45 * Math.PI / 180) / 2) * 5
   const vW = vH * aspect
 
-  // Position
+  // Apply manual Y offset (multiplied by scale for consistency)
   const tx = (0.5 - p6.x) * vW
-  const ty = (0.5 - p6.y) * vH
-  faceGroup.position.set(tx, ty, 0)
+  const ty = (0.5 - p6.y) * vH + (manualY * 0.5) 
+  const tz = manualZ * 0.5 // Manual Depth
+  
+  faceGroup.position.set(tx, ty, tz)
 
-  // Rotation
   if (matrix) {
     const m = new THREE.Matrix4().fromArray(matrix.data)
     const pos = new THREE.Vector3(), quat = new THREE.Quaternion(), scl = new THREE.Vector3()
     m.decompose(pos, quat, scl)
-    
-    // Invert Y and Z to match mirrored video
     quat.y = -quat.y
     quat.z = -quat.z
     faceGroup.quaternion.copy(quat)
   }
 
-  // Scale: Distance between eye corners
   const p33 = landmarks[33]
   const p263 = landmarks[263]
   const eyeDist = Math.sqrt(Math.pow(p33.x - p263.x, 2) + Math.pow(p33.y - p263.y, 2))
   
-  // Scale increased to 2.45 for better fit
-  const s = eyeDist * 2.45
+  // Base scale 2.45 * manual slider
+  const s = eyeDist * 2.45 * manualScale
   faceGroup.scale.set(s, s, s)
 }
