@@ -627,26 +627,31 @@ function drawGlasses(ctx, landmarks, matrix, w, h) {
   const anchorY = smoothedPos.y - yOffset
 
   // ─── Draw Temples (Arms) ───
-  const pL_Ear = {
+  // We need to match screen-left frame edge with screen-left ear
+  const p1 = {
     x: (flipX ? (1 - landmarks[127].x) : landmarks[127].x) * w,
     y: landmarks[127].y * h
   }
-  const pR_Ear = {
+  const p2 = {
     x: (flipX ? (1 - landmarks[389].x) : landmarks[389].x) * w,
     y: landmarks[389].y * h
   }
 
+  // Sort by X to find which is screen-left and screen-right
+  const pScreenL = p1.x < p2.x ? p1 : p2
+  const pScreenR = p1.x < p2.x ? p2 : p1
+
   const drawTemple = (startX, startY, endX, endY) => {
     ctx.save()
     const grad = ctx.createLinearGradient(startX, startY, endX, endY)
-    grad.addColorStop(0, 'rgba(30, 30, 30, 0.9)')
-    grad.addColorStop(0.8, 'rgba(30, 30, 30, 0.3)')
-    grad.addColorStop(1, 'rgba(30, 30, 30, 0)')
+    grad.addColorStop(0, 'rgba(40, 40, 40, 1)')
+    grad.addColorStop(0.8, 'rgba(40, 40, 40, 0.4)')
+    grad.addColorStop(1, 'rgba(40, 40, 40, 0)')
     ctx.beginPath()
     ctx.strokeStyle = grad
     ctx.lineWidth = smoothedPos.w * 0.04
     ctx.lineCap = 'round'
-    ctx.shadowBlur = 10
+    ctx.shadowBlur = 8
     ctx.shadowColor = 'rgba(0,0,0,0.5)'
     ctx.moveTo(startX, startY)
     ctx.lineTo(endX, endY)
@@ -654,14 +659,20 @@ function drawGlasses(ctx, landmarks, matrix, w, h) {
     ctx.restore()
   }
 
+  // Frame outer edges on screen
   const halfW = (smoothedPos.w / 2) * Math.cos(smoothedPos.yaw)
-  const fLx = anchorX - halfW * Math.cos(smoothedPos.roll)
-  const fLy = anchorY - halfW * Math.sin(smoothedPos.roll)
-  const fRx = anchorX + halfW * Math.cos(smoothedPos.roll)
-  const fRy = anchorY + halfW * Math.sin(smoothedPos.roll)
+  const cosR = Math.cos(smoothedPos.roll)
+  const sinR = Math.sin(smoothedPos.roll)
 
-  drawTemple(fLx, fLy, pL_Ear.x, pL_Ear.y)
-  drawTemple(fRx, fRy, pR_Ear.x, pR_Ear.y)
+  // fLx is screen-left edge, fRx is screen-right edge
+  const fLx = anchorX - halfW * cosR
+  const fLy = anchorY - halfW * sinR
+  const fRx = anchorX + halfW * cosR
+  const fRy = anchorY + halfW * sinR
+
+  // Connect screen-left to screen-left, screen-right to screen-right
+  drawTemple(fLx, fLy, pScreenL.x, pScreenL.y)
+  drawTemple(fRx, fRy, pScreenR.x, pScreenR.y)
 
   // ─── Draw Main Frame ───
   ctx.translate(anchorX, anchorY)
