@@ -1,4 +1,5 @@
 import './style.css'
+import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision'
 
 const app = document.querySelector('#app')
 
@@ -251,11 +252,10 @@ async function startExperience() {
   startButton.disabled = true
   setStatus('Loading AI model…', 'warning')
   setTrackingState('Loading')
-  showLoading('Fetching MediaPipe…', 10)
+  showLoading('Initializing neural net…', 20)
 
   try {
-    // Lazy load MediaPipe Tasks Vision
-    const { FaceLandmarker, FilesetResolver } = await import('@mediapipe/tasks-vision')
+    // MediaPipe components are now imported at the top-level
     
     showLoading('Loading Wasm…', 40)
     // Create fileset resolver (using CDN for wasm files to keep bundle size small)
