@@ -5,14 +5,15 @@ import * as THREE from 'three'
 const scene = new THREE.Scene()
 const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000)
 const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true })
+renderer.setClearColor(0x000000, 0) // Fully transparent
 renderer.setSize(window.innerWidth, window.innerHeight)
-renderer.setPixelRatio(window.devicePixelRatio)
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
 document.querySelector('#app').appendChild(renderer.domElement)
-renderer.domElement.style.position = 'absolute'
+renderer.domElement.style.position = 'fixed'
 renderer.domElement.style.top = '0'
 renderer.domElement.style.left = '0'
+renderer.domElement.style.zIndex = '5'
 renderer.domElement.style.pointerEvents = 'none'
-renderer.domElement.id = 'threeCanvas'
 
 // Lights
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.8)
@@ -65,7 +66,7 @@ app.innerHTML += `
   <main class="mobile-shell">
     <section class="viewer-panel" id="mainViewer">
       <div class="camera-stage">
-        <video id="videoElement" autoplay playsinline hidden></video>
+        <video id="videoElement" autoplay playsinline></video>
         <canvas id="outputCanvas" class="output-canvas" hidden></canvas>
 
         <div class="overlay top-overlay">
