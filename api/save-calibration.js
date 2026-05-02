@@ -1,15 +1,23 @@
 import { kv } from '@vercel/kv';
+import Redis from 'ioredis';
+
+// Singleton for ioredis to prevent connection leaks
+let redisClient = null;
+function getRedis() {
+  if (process.env.KV_REST_API_URL) return kv;
+  if (!redisClient && process.env.REDIS_URL) {
+    redisClient = new Redis(process.env.REDIS_URL);
+  }
+  return redisClient;
+}
 
 export default async function handler(req, res) {
-  // Debug environment variables (without revealing tokens)
-  const hasUrl = !!process.env.KV_REST_API_URL;
-  const hasToken = !!process.env.KV_REST_API_TOKEN;
+  const client = getRedis();
 
-  if (!hasUrl || !hasToken) {
+  if (!client) {
     return res.status(500).json({ 
-      error: 'KV Environment variables missing', 
-      details: { hasUrl, hasToken },
-      note: 'Please ensure KV is connected in Vercel Storage settings and you have redeployed.'
+      error: 'No Redis configuration found', 
+      note: 'Please ensure either KV_REST_API_URL or REDIS_URL is set in environment variables.' 
     });
   }
 
@@ -19,17 +27,21 @@ export default async function handler(req, res) {
       const record = {
         id: Date.now(),
         timestamp: new Date().toISOString(),
-        source: 'vercel-kv',
+        source: process.env.KV_REST_API_URL ? 'vercel-kv' : 'direct-redis',
         ...newData
       };
 
-      // Push to a list named 'calibration_data'
-      await kv.lpush('calibration_data', record);
-      
-      // Limit to last 1000 records to avoid blowing up memory
-      await kv.ltrim('calibration_data', 0, 999);
+      if (process.env.KV_REST_API_URL) {
+        // Use @vercel/kv (REST)
+        await kv.lpush('calibration_data', record);
+        await kv.ltrim('calibration_data', 0, 999);
+      } else {
+        // Use ioredis (Direct)
+        await client.lpush('calibration_data', JSON.stringify(record));
+        await client.ltrim('calibration_data', 0, 999);
+      }
 
-      return res.status(200).json({ success: true, count: await kv.llen('calibration_data') });
+      return res.status(200).json({ success: true });
     } catch (error) {
       return res.status(500).json({ error: error.message });
     }
