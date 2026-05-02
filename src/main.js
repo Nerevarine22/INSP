@@ -227,6 +227,10 @@ function update3D(landmarks, matrix) {
     const m = new THREE.Matrix4().fromArray(matrix.data)
     const pos = new THREE.Vector3(), quat = new THREE.Quaternion(), scl = new THREE.Vector3()
     m.decompose(pos, quat, scl)
+    
+    // Invert Y and Z to match mirrored video
+    quat.y = -quat.y
+    quat.z = -quat.z
     faceGroup.quaternion.copy(quat)
   }
 
