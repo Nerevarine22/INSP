@@ -361,7 +361,10 @@ autoDetectToggle.addEventListener('change', (e) => {
   isAutoDetectionEnabled = e.target.checked;
   if (!isAutoDetectionEnabled) {
     recommendationCard.hidden = true;
+    calibrationPanel.hidden = false; // Show buttons automatically in manual mode
     currentCategoryStr = null;
+  } else {
+    calibrationPanel.hidden = true; // Hide buttons when AI is back on
   }
 });
 
