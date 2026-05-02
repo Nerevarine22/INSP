@@ -480,13 +480,20 @@ function drawGlasses(ctx, landmarks, matrix, w, h) {
     const bezierOffset = bezierOffsetPx / U
 
     // Step 3: Classification
+    console.log(`H: ${heightUnits.toFixed(2)} W: ${widthUnits.toFixed(2)} J: ${jawUnits.toFixed(2)}`)
+    
     let bestShape = 'Oval'
-    if (heightUnits > 3.35) {
+    if (heightUnits > 3.15) {
       bestShape = 'Elongated'
-    } else if (jawUnits > 2.85 && bezierOffset > 0.15) {
+    } else if (jawUnits > 2.75 && bezierOffset > 0.10) {
       bestShape = 'Angular'
-    } else if (widthUnits > 3.1 && jawUnits < 2.7) {
+    } else if (widthUnits > jawUnits * 1.1 && heightUnits < 3.1) {
       bestShape = 'Rounded'
+    } else if (heightUnits >= 2.9 && heightUnits <= 3.1) {
+      bestShape = 'Oval'
+    } else {
+      // Fallback for edge cases outside the strict Oval window
+      bestShape = heightUnits < 2.9 ? 'Rounded' : 'Elongated'
     }
 
     // Add to buffer for stabilization of the classification
