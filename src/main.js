@@ -159,6 +159,14 @@ const faceShapeModels = document.querySelector('#faceShapeModels')
 const recBody = document.querySelector('#recBody')
 const recommendationCard = document.querySelector('#recommendationCard')
 
+// Face shape detection state
+let shapeDetectTimeout = null
+let currentCategoryStr = null
+const faceMetricsBuffer = []
+const MAX_METRICS_BUFFER = 15
+const uBuffer = []
+const MAX_U_BUFFER = 10
+
 // Mode Switching
 const navButtons = document.querySelectorAll('.nav-btn')
 const panels = {
@@ -172,6 +180,156 @@ function switchMode(mode) {
   Object.keys(panels).forEach(p => { if(panels[p]) panels[p].hidden = (p !== mode) })
 }
 navButtons.forEach(b => b.addEventListener('click', () => switchMode(b.dataset.mode)))
+
+function getPointDist(p1, p2) {
+  return Math.hypot(p1.x - p2.x, p1.y - p2.y)
+}
+
+function pointToLineDist(pt, lineStart, lineEnd) {
+  const num = Math.abs((lineEnd.x - lineStart.x) * (lineStart.y - pt.y) - (lineStart.x - pt.x) * (lineEnd.y - lineStart.y))
+  const den = getPointDist(lineStart, lineEnd)
+  return den === 0 ? 0 : num / den
+}
+
+function getAngle(pCenter, p1, p2) {
+  const v1 = { x: p1.x - pCenter.x, y: p1.y - pCenter.y }
+  const v2 = { x: p2.x - pCenter.x, y: p2.y - pCenter.y }
+  const dot = v1.x * v2.x + v1.y * v2.y
+  const mag1 = Math.hypot(v1.x, v1.y)
+  const mag2 = Math.hypot(v2.x, v2.y)
+  if (mag1 === 0 || mag2 === 0) return 0
+  const normalizedDot = THREE.MathUtils.clamp(dot / (mag1 * mag2), -1, 1)
+  return Math.acos(normalizedDot) * (180 / Math.PI)
+}
+
+function getMedian(arr) {
+  if (arr.length === 0) return 0
+  const sorted = [...arr].sort((a, b) => a - b)
+  const mid = Math.floor(sorted.length / 2)
+  return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2
+}
+
+function resetFaceShapeUI() {
+  recommendationCard.hidden = true
+  recBody.hidden = true
+  faceShapeCategory.textContent = 'Analyzing...'
+  faceShapeAdvice.textContent = ''
+  faceShapeModels.textContent = ''
+  currentCategoryStr = null
+  faceMetricsBuffer.length = 0
+  uBuffer.length = 0
+  if (shapeDetectTimeout) clearTimeout(shapeDetectTimeout)
+}
+
+function updateFaceShapeRecommendation(landmarks) {
+  const getP = (idx) => ({
+    x: landmarks[idx].x,
+    y: landmarks[idx].y
+  })
+
+  const p8 = getP(8)
+  const p2 = getP(2)
+  const p10 = getP(10)
+  const p152 = getP(152)
+  const p234 = getP(234)
+  const p454 = getP(454)
+  const p132 = getP(132)
+  const p361 = getP(361)
+
+  const rawU = getPointDist(p8, p2)
+  if (uBuffer.length >= MAX_U_BUFFER) uBuffer.shift()
+  uBuffer.push(rawU)
+
+  const U = getMedian(uBuffer)
+  if (U <= 0) return
+
+  const heightUnits = getPointDist(p10, p152) / U
+  const widthUnits = getPointDist(p234, p454) / U
+  const jawUnits = getPointDist(p132, p361) / U
+  const bezierOffsetPx = pointToLineDist(p132, p234, p152)
+  const bezierOffset = bezierOffsetPx / U
+
+  const angleL = getAngle(p132, p234, p152)
+  const angleR = getAngle(p361, p454, p152)
+  const jawAngle = (angleL + angleR) / 2
+
+  const ratioHW = heightUnits / widthUnits
+  const diffWJ = widthUnits - jawUnits
+  const scores = {
+    Oval: 0,
+    Rounded: 0,
+    Angular: 0,
+    Elongated: 0
+  }
+
+  if (ratioHW > 1.26) scores.Elongated += 4
+  else if (ratioHW > 1.16) scores.Oval += 2
+  else scores.Rounded += 2
+
+  if (jawAngle < 137) scores.Angular += 4
+  else if (jawAngle < 142) {
+    scores.Angular += 1
+    scores.Rounded += 2
+  } else {
+    scores.Oval += 3
+  }
+
+  if (diffWJ > 0.14) scores.Rounded += 4
+  else if (diffWJ < 0.07) scores.Angular += 4
+  else {
+    scores.Oval += 2
+    scores.Elongated += 1
+  }
+
+  if (widthUnits > 2.65) scores.Rounded += 2
+  if (widthUnits < 2.35) scores.Elongated += 2
+  if (bezierOffset > 0.28) scores.Rounded += 1
+  if (bezierOffset < 0.18) scores.Angular += 1
+
+  let bestShape = Object.keys(scores).reduce((a, b) => scores[a] > scores[b] ? a : b)
+  if (scores[bestShape] < 3) bestShape = 'Oval'
+
+  if (faceMetricsBuffer.length >= MAX_METRICS_BUFFER) faceMetricsBuffer.shift()
+  faceMetricsBuffer.push(bestShape)
+
+  const counts = faceMetricsBuffer.reduce((acc, shape) => {
+    acc[shape] = (acc[shape] || 0) + 1
+    return acc
+  }, {})
+  const currentShapeKey = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b)
+
+  let category = 'Oval (Овальне)'
+  let advice = 'Ідеальний баланс: вам підійде майже будь-яка форма!'
+  let recommendedModels = ['Aviator', 'Wayfarer', 'Round']
+
+  if (currentShapeKey === 'Elongated') {
+    category = 'Elongated (Подовжене)'
+    advice = 'Обличчя витягнуте: обирайте більші оправи, щоб візуально збалансувати пропорції.'
+    recommendedModels = ['Oversized', 'Wayfarer', 'Aviator']
+  } else if (currentShapeKey === 'Angular') {
+    category = 'Angular (Квадратне/Гостре)'
+    advice = 'Виражені кути: краще працюють круглі або овальні оправи, які пом’якшують контури.'
+    recommendedModels = ['Round', 'Oval', 'Panto']
+  } else if (currentShapeKey === 'Rounded') {
+    category = 'Rounded (Кругле)'
+    advice = 'Плавні лінії: прямокутні та більш графічні оправи додають структури.'
+    recommendedModels = ['Square', 'Rectangular', 'Cat-eye']
+  }
+
+  recommendationCard.hidden = false
+  if (category !== currentCategoryStr) {
+    currentCategoryStr = category
+    faceShapeCategory.textContent = 'Analyzing...'
+    recBody.hidden = true
+    if (shapeDetectTimeout) clearTimeout(shapeDetectTimeout)
+    shapeDetectTimeout = setTimeout(() => {
+      faceShapeCategory.textContent = category
+      faceShapeAdvice.textContent = advice
+      faceShapeModels.textContent = recommendedModels.join(', ')
+      recBody.hidden = false
+    }, 600)
+  }
+}
 
 // Mediapipe
 let faceLandmarker
@@ -205,6 +363,7 @@ function loop() {
     update3D(results.faceLandmarks[0], results.facialTransformationMatrixes ? results.facialTransformationMatrixes[0] : null)
   } else {
     faceGroup.visible = false
+    resetFaceShapeUI()
   }
   
   renderer.render(scene, camera)
@@ -265,4 +424,6 @@ function update3D(landmarks, matrix) {
   faceGroup.position.copy(smoothedPos)
   faceGroup.quaternion.copy(smoothedQuat)
   faceGroup.scale.copy(smoothedScale)
+
+  updateFaceShapeRecommendation(landmarks)
 }
