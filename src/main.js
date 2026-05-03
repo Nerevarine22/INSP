@@ -361,6 +361,17 @@ const ANCHOR_LERP = 0.22
 const POSITION_DEADZONE = 0.012
 const SCALE_DEADZONE = 0.008
 const ROTATION_DEADZONE_DOT = 0.9996
+const POSITION_LERP_MIN = 0.16
+const POSITION_LERP_MAX = 0.42
+const POSITION_ADAPTIVE_RANGE = 0.12
+const HYBRID_ROTATION_BLEND = 0.38
+
+function normalizeAngleDelta(angle) {
+  let normalized = angle
+  while (normalized > Math.PI) normalized -= Math.PI * 2
+  while (normalized < -Math.PI) normalized += Math.PI * 2
+  return normalized
+}
 
 function update3D(landmarks, matrix) {
   faceGroup.visible = true
@@ -397,13 +408,29 @@ function update3D(landmarks, matrix) {
 
   const p33 = landmarks[33]
   const p263 = landmarks[263]
+  const p234 = landmarks[234]
+  const p454 = landmarks[454]
   const eyeDist = Math.hypot(p33.x - p263.x, p33.y - p263.y)
   const s = eyeDist * 2.45 * manualScale
   const targetScale = new THREE.Vector3(s, s, s)
 
+  const landmarkRoll = -Math.atan2(p263.y - p33.y, p263.x - p33.x)
+  const cheekDepthDiff = p454.z - p234.z
+  const landmarkYaw = THREE.MathUtils.clamp(cheekDepthDiff * 7.5, -0.75, 0.75)
+
+  const matrixEuler = new THREE.Euler().setFromQuaternion(targetQuat, 'YXZ')
+  matrixEuler.z += normalizeAngleDelta(landmarkRoll - matrixEuler.z) * HYBRID_ROTATION_BLEND
+  matrixEuler.y += normalizeAngleDelta(landmarkYaw - matrixEuler.y) * HYBRID_ROTATION_BLEND
+  targetQuat.setFromEuler(matrixEuler)
+
   const positionDelta = smoothedPos.distanceTo(targetPos)
   if (positionDelta > POSITION_DEADZONE) {
-    smoothedPos.lerp(targetPos, POSITION_LERP)
+    const adaptivePositionLerp = THREE.MathUtils.clamp(
+      POSITION_LERP_MIN + (positionDelta / POSITION_ADAPTIVE_RANGE) * (POSITION_LERP_MAX - POSITION_LERP_MIN),
+      POSITION_LERP_MIN,
+      POSITION_LERP_MAX
+    )
+    smoothedPos.lerp(targetPos, adaptivePositionLerp)
   }
 
   const rotationAlignment = Math.abs(smoothedQuat.dot(targetQuat))
