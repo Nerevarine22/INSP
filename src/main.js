@@ -42,6 +42,7 @@ faceGroup.add(headOccluder)
 
 // Models State
 let current3DModel = null
+const modelBaseOffset = new THREE.Vector3()
 const gltfLoader = new GLTFLoader()
 
 // Load 3D Model Function
@@ -57,6 +58,7 @@ function load3DModel(path) {
     
     current3DModel.position.sub(center)
     current3DModel.position.z = -0.4
+    modelBaseOffset.copy(current3DModel.position)
     
     const scale = 1.8 / size.x
     current3DModel.scale.set(scale, scale, scale)
@@ -239,10 +241,7 @@ function update3D(landmarks, matrix) {
     targetQuat.copy(quat)
   }
 
-  // Move the glasses along the head's local forward axis instead of the
-  // world's Z axis, so depth stays intuitive while the head rotates.
-  const depthOffset = new THREE.Vector3(0, 0, manualZ * 0.3).applyQuaternion(targetQuat)
-  const targetPos = basePos.add(depthOffset)
+  const targetPos = basePos
 
   const p33 = landmarks[33]
   const p263 = landmarks[263]
@@ -254,6 +253,14 @@ function update3D(landmarks, matrix) {
   smoothedPos.lerp(targetPos, LERP_FACTOR)
   smoothedQuat.slerp(targetQuat, LERP_FACTOR)
   smoothedScale.lerp(targetScale, LERP_FACTOR)
+
+  if (current3DModel) {
+    // Apply depth in the model's local space so the face anchor stays stable
+    // while head rotation still carries the glasses naturally.
+    const depthLocalOffset = manualZ * 0.3 / Math.max(smoothedScale.z, 0.001)
+    current3DModel.position.copy(modelBaseOffset)
+    current3DModel.position.z = modelBaseOffset.z + depthLocalOffset
+  }
 
   faceGroup.position.copy(smoothedPos)
   faceGroup.quaternion.copy(smoothedQuat)
