@@ -159,6 +159,8 @@ const faceMetricsBuffer = []
 const MAX_METRICS_BUFFER = 15
 const uBuffer = []
 const MAX_U_BUFFER = 10
+const scaleUnitBuffer = []
+const MAX_SCALE_UNIT_BUFFER = 10
 
 // Mode Switching
 const navButtons = document.querySelectorAll('.nav-btn')
@@ -353,25 +355,17 @@ let smoothedAnchor = new THREE.Vector3()
 let smoothedPos = new THREE.Vector3()
 let smoothedQuat = new THREE.Quaternion()
 let smoothedScale = new THREE.Vector3(1, 1, 1)
+let smoothedDepthOffset = 0
 let hasSmoothedAnchor = false
+let scaleCalibrationFactor = null
 const POSITION_LERP = 0.18
 const ROTATION_LERP = 0.34
 const SCALE_LERP = 0.14
 const ANCHOR_LERP = 0.22
+const DEPTH_LERP = 0.18
 const POSITION_DEADZONE = 0.012
 const SCALE_DEADZONE = 0.008
 const ROTATION_DEADZONE_DOT = 0.9996
-const POSITION_LERP_MIN = 0.16
-const POSITION_LERP_MAX = 0.42
-const POSITION_ADAPTIVE_RANGE = 0.12
-const HYBRID_ROTATION_BLEND = 0.38
-
-function normalizeAngleDelta(angle) {
-  let normalized = angle
-  while (normalized > Math.PI) normalized -= Math.PI * 2
-  while (normalized < -Math.PI) normalized += Math.PI * 2
-  return normalized
-}
 
 function update3D(landmarks, matrix) {
   faceGroup.visible = true
@@ -406,31 +400,29 @@ function update3D(landmarks, matrix) {
 
   const targetPos = smoothedAnchor.clone()
 
+  const p8 = landmarks[8]
+  const p2 = landmarks[2]
   const p33 = landmarks[33]
   const p263 = landmarks[263]
-  const p234 = landmarks[234]
-  const p454 = landmarks[454]
+  const rawFaceUnit = Math.hypot(p8.x - p2.x, p8.y - p2.y)
+  if (scaleUnitBuffer.length >= MAX_SCALE_UNIT_BUFFER) scaleUnitBuffer.shift()
+  scaleUnitBuffer.push(rawFaceUnit)
+
+  const stableFaceUnit = getMedian(scaleUnitBuffer)
   const eyeDist = Math.hypot(p33.x - p263.x, p33.y - p263.y)
-  const s = eyeDist * 2.45 * manualScale
+  if (!scaleCalibrationFactor && stableFaceUnit > 0) {
+    scaleCalibrationFactor = (eyeDist * 2.45) / stableFaceUnit
+  }
+
+  const baseScale = scaleCalibrationFactor && stableFaceUnit > 0
+    ? stableFaceUnit * scaleCalibrationFactor
+    : eyeDist * 2.45
+  const s = baseScale * manualScale
   const targetScale = new THREE.Vector3(s, s, s)
-
-  const landmarkRoll = -Math.atan2(p263.y - p33.y, p263.x - p33.x)
-  const cheekDepthDiff = p454.z - p234.z
-  const landmarkYaw = THREE.MathUtils.clamp(cheekDepthDiff * 7.5, -0.75, 0.75)
-
-  const matrixEuler = new THREE.Euler().setFromQuaternion(targetQuat, 'YXZ')
-  matrixEuler.z += normalizeAngleDelta(landmarkRoll - matrixEuler.z) * HYBRID_ROTATION_BLEND
-  matrixEuler.y += normalizeAngleDelta(landmarkYaw - matrixEuler.y) * HYBRID_ROTATION_BLEND
-  targetQuat.setFromEuler(matrixEuler)
 
   const positionDelta = smoothedPos.distanceTo(targetPos)
   if (positionDelta > POSITION_DEADZONE) {
-    const adaptivePositionLerp = THREE.MathUtils.clamp(
-      POSITION_LERP_MIN + (positionDelta / POSITION_ADAPTIVE_RANGE) * (POSITION_LERP_MAX - POSITION_LERP_MIN),
-      POSITION_LERP_MIN,
-      POSITION_LERP_MAX
-    )
-    smoothedPos.lerp(targetPos, adaptivePositionLerp)
+    smoothedPos.lerp(targetPos, POSITION_LERP)
   }
 
   const rotationAlignment = Math.abs(smoothedQuat.dot(targetQuat))
@@ -448,9 +440,10 @@ function update3D(landmarks, matrix) {
   if (current3DModel) {
     // Apply depth in the model's local space so the face anchor stays stable
     // while head rotation still carries the glasses naturally.
-    const depthLocalOffset = manualZ * 0.3 / Math.max(smoothedScale.z, 0.001)
+    const targetDepthOffset = manualZ * 0.3 / Math.max(smoothedScale.z, 0.001)
+    smoothedDepthOffset = THREE.MathUtils.lerp(smoothedDepthOffset, targetDepthOffset, DEPTH_LERP)
     current3DModel.position.copy(modelBaseOffset)
-    current3DModel.position.z = modelBaseOffset.z + depthLocalOffset
+    current3DModel.position.z = modelBaseOffset.z + smoothedDepthOffset
   }
 
   faceGroup.position.copy(smoothedPos)
