@@ -222,13 +222,12 @@ function update3D(landmarks, matrix) {
   const vH = 2 * Math.tan((45 * Math.PI / 180) / 2) * 5
   const vW = vH * aspect
 
-  // Target values
-  const targetPos = new THREE.Vector3(
+  const basePos = new THREE.Vector3(
     (0.5 - p6.x) * vW,
     (0.5 - p6.y) * vH,
-    manualZ * 1.5 // Manual Depth from slider
+    0
   )
-  targetPos.y += (manualY * 0.5) // Manual Height from slider
+  basePos.y += (manualY * 0.5) // Manual Height from slider
 
   const targetQuat = new THREE.Quaternion()
   if (matrix) {
@@ -239,6 +238,11 @@ function update3D(landmarks, matrix) {
     quat.z = -quat.z
     targetQuat.copy(quat)
   }
+
+  // Move the glasses along the head's local forward axis instead of the
+  // world's Z axis, so depth stays intuitive while the head rotates.
+  const depthOffset = new THREE.Vector3(0, 0, manualZ * 0.3).applyQuaternion(targetQuat)
+  const targetPos = basePos.add(depthOffset)
 
   const p33 = landmarks[33]
   const p263 = landmarks[263]
