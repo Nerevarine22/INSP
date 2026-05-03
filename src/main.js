@@ -43,36 +43,13 @@ faceGroup.add(headOccluder)
 // Models State
 let current3DModel = null
 const gltfLoader = new GLTFLoader()
-const textureLoader = new THREE.TextureLoader()
 
 // Load 3D Model Function
-function load3DModel(path, texturePath = null) {
+function load3DModel(path) {
   if (current3DModel) faceGroup.remove(current3DModel)
 
   gltfLoader.load(path, (gltf) => {
     current3DModel = gltf.scene
-    
-    // Apply Texture if provided
-    if (texturePath) {
-      const newTex = textureLoader.load(texturePath)
-      newTex.flipY = false
-      
-      current3DModel.traverse((node) => {
-        if (node.isMesh) {
-          const isLens = node.name.toLowerCase().includes('lens') || node.name.toLowerCase().includes('glass')
-          
-          node.material = new THREE.MeshStandardMaterial({
-            map: newTex,
-            transparent: isLens, // Only lenses stay transparent by default
-            opacity: isLens ? 0.6 : 1.0,
-            alphaTest: 0.1,
-            side: THREE.DoubleSide,
-            roughness: 0.3,
-            metalness: 0.2
-          })
-        }
-      })
-    }
 
     const box = new THREE.Box3().setFromObject(current3DModel)
     const size = box.getSize(new THREE.Vector3())
@@ -88,8 +65,8 @@ function load3DModel(path, texturePath = null) {
   })
 }
 
-// Initial Load with image.png texture
-load3DModel('/Glasses.glb', '/image.png')
+// Initial load with the model's built-in materials
+load3DModel('/Glasses.glb')
 
 // --- RENDER UI ---
 uiOverlay.innerHTML = `
