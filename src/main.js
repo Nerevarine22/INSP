@@ -320,7 +320,7 @@ async function start() {
   const vision = await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm')
   faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
     baseOptions: { modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task', delegate: 'GPU' },
-    runningMode: 'VIDEO', outputFacialTransformationMatrixes: true
+    runningMode: 'VIDEO', numFaces: 1, outputFacialTransformationMatrixes: true
   })
   
   const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 1280, height: 720 } })
