@@ -40,50 +40,10 @@ const headOccluder = new THREE.Mesh(occluderGeometry, new THREE.MeshBasicMateria
 headOccluder.position.z = -0.7 // Push it further back
 faceGroup.add(headOccluder)
 
-// --- CONFIGURATION ---
-const framesConfig = [
-  { id: "3d_classic", name: "Classic 3D", type: "3d", path: "/Glasses.glb", recommended: ["Oval", "Angular"] },
-  { id: "aviator", name: "Aviator", type: "parametric", texture: "/glasses.svg", alpha: "/glasses.svg", baseScale: { x: 1.1, y: 1.0 } },
-  { id: "wayfarer", name: "Wayfarer", type: "parametric", texture: "/image-Photoroom.png", alpha: "/image-Photoroom.png", baseScale: { x: 1.0, y: 1.1 } },
-  { id: "sport", name: "Sport", type: "parametric", texture: "/pngwing.com.png", alpha: "/pngwing.com.png", baseScale: { x: 1.2, y: 0.9 } }
-]
-
-// --- PARAMETRIC SKELETON ---
-const parametricGroup = new THREE.Group()
-faceGroup.add(parametricGroup)
-
-const frameMaterial = new THREE.MeshStandardMaterial({ transparent: true, side: THREE.DoubleSide, metalness: 0.2, roughness: 0.5 })
-const framePlane = new THREE.Mesh(new THREE.PlaneGeometry(2, 0.8), frameMaterial)
-framePlane.position.z = 0.2
-parametricGroup.add(framePlane)
-
-const templeMat = new THREE.MeshStandardMaterial({ color: 0x111111 })
-const leftTemple = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 2.5), templeMat)
-leftTemple.position.set(-0.95, 0, -1.1)
-parametricGroup.add(leftTemple)
-const rightTemple = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 2.5), templeMat)
-rightTemple.position.set(0.95, 0, -1.1)
-parametricGroup.add(rightTemple)
-
 // Models State
 let current3DModel = null
 const gltfLoader = new GLTFLoader()
 const textureLoader = new THREE.TextureLoader()
-
-function switchFrame(config) {
-  parametricGroup.visible = false
-  if (current3DModel) current3DModel.visible = false
-  
-  if (config.type === "3d") {
-    load3DModel(config.path, '/image.png')
-  } else {
-    parametricGroup.visible = true
-    frameMaterial.map = textureLoader.load(config.texture)
-    framePlane.scale.set(config.baseScale.x, config.baseScale.y, 1)
-    leftTemple.position.x = -0.95 * config.baseScale.x
-    rightTemple.position.x = 0.95 * config.baseScale.x
-  }
-}
 
 // Load 3D Model Function
 function load3DModel(path, texturePath = null) {
@@ -156,11 +116,7 @@ uiOverlay.innerHTML = `
           </div>
 
           <div class="frame-gallery" id="frameGallery">
-            <div class="frame-item active" data-src="/Glasses.glb"><span>3D</span></div>
-            <div class="frame-item" data-src="/glasses.svg"><img src="/glasses.svg"></div>
-            <div class="frame-item" data-src="/image-Photoroom.png"><img src="/image-Photoroom.png"></div>
-            <div class="frame-item" data-src="/pngwing.com.png"><img src="/pngwing.com.png"></div>
-            <div class="frame-item" data-src="/image.png"><img src="/image.png"></div>
+            <div class="frame-item active"><span>3D</span></div>
           </div>
 
           <div class="mode-nav">
@@ -237,17 +193,6 @@ function switchMode(mode) {
   Object.keys(panels).forEach(p => { if(panels[p]) panels[p].hidden = (p !== mode) })
 }
 navButtons.forEach(b => b.addEventListener('click', () => switchMode(b.dataset.mode)))
-
-// Frame Switching
-document.querySelectorAll('.frame-item').forEach((item, index) => {
-  item.addEventListener('click', () => {
-    document.querySelectorAll('.frame-item').forEach(f => f.classList.remove('active'))
-    item.classList.add('active')
-    
-    const config = framesConfig[index]
-    if (config) switchFrame(config)
-  })
-})
 
 // Mediapipe
 let faceLandmarker
