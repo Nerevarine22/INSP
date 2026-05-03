@@ -219,14 +219,14 @@ const LERP_FACTOR = 0.2 // (0.8 old + 0.2 new)
 
 function update3D(landmarks, matrix) {
   faceGroup.visible = true
-  const p6 = landmarks[6]
+  const anchor = landmarks[168]
   const aspect = window.innerWidth / window.innerHeight
   const vH = 2 * Math.tan((45 * Math.PI / 180) / 2) * 5
   const vW = vH * aspect
 
   const basePos = new THREE.Vector3(
-    (0.5 - p6.x) * vW,
-    (0.5 - p6.y) * vH,
+    (0.5 - anchor.x) * vW,
+    (0.5 - anchor.y) * vH,
     0
   )
   basePos.y += (manualY * 0.5) // Manual Height from slider
