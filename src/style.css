@@ -30,7 +30,7 @@ body, html {
   z-index: 20; display: flex; flex-direction: column;
 }
 
-.top-overlay { top: 0; align-items: center; }
+.top-overlay { top: 0; align-items: center; gap: 10px; }
 .settings-panel {
   background: var(--panel);
   backdrop-filter: var(--glass);
@@ -122,8 +122,21 @@ body, html {
   text-decoration: none; font-size: 1.1rem;
 }
 
-.recommendation-card {
-  background: var(--panel); backdrop-filter: var(--glass);
-  padding: 15px; border-radius: 20px; border: 1px solid var(--panel-border);
-  pointer-events: auto;
+.stylist-inline {
+  background: rgba(20, 18, 16, 0.72);
+  backdrop-filter: var(--glass);
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.stylist-inline-label {
+  color: var(--muted);
 }

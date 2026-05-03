@@ -82,18 +82,14 @@ uiOverlay.innerHTML = `
             <div class="status-dot" id="statusDot"></div>
             <span id="statusText">Ready</span>
           </div>
+          <div class="stylist-inline" id="recommendationCard" hidden>
+            <span class="stylist-inline-label">Stylist:</span>
+            <strong id="faceShapeCategory">Analyzing...</strong>
+          </div>
           <button id="startButton" class="primary-button">Start Experience</button>
         </div>
 
         <div class="overlay bottom-overlay">
-          <div class="recommendation-card" id="recommendationCard" hidden>
-            <div class="rec-header">Stylist: <strong id="faceShapeCategory">Analyzing...</strong></div>
-            <div class="rec-body" id="recBody" hidden>
-              <p id="faceShapeAdvice" class="rec-advice"></p>
-              <p class="rec-models"><strong>Models:</strong> <span id="faceShapeModels"></span></p>
-            </div>
-          </div>
-
           <div class="frame-gallery" id="frameGallery">
             <div class="frame-item active"><span>3D</span></div>
           </div>
@@ -154,9 +150,6 @@ document.querySelector('#sliderZ').addEventListener('input', (e) => { manualZ = 
 const video = document.querySelector('#videoElement')
 const startButton = document.querySelector('#startButton')
 const faceShapeCategory = document.querySelector('#faceShapeCategory')
-const faceShapeAdvice = document.querySelector('#faceShapeAdvice')
-const faceShapeModels = document.querySelector('#faceShapeModels')
-const recBody = document.querySelector('#recBody')
 const recommendationCard = document.querySelector('#recommendationCard')
 
 // Face shape detection state
@@ -211,10 +204,7 @@ function getMedian(arr) {
 
 function resetFaceShapeUI() {
   recommendationCard.hidden = true
-  recBody.hidden = true
   faceShapeCategory.textContent = 'Analyzing...'
-  faceShapeAdvice.textContent = ''
-  faceShapeModels.textContent = ''
   currentCategoryStr = null
   faceMetricsBuffer.length = 0
   uBuffer.length = 0
@@ -299,34 +289,22 @@ function updateFaceShapeRecommendation(landmarks) {
   const currentShapeKey = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b)
 
   let category = 'Oval (Овальне)'
-  let advice = 'Ідеальний баланс: вам підійде майже будь-яка форма!'
-  let recommendedModels = ['Aviator', 'Wayfarer', 'Round']
 
   if (currentShapeKey === 'Elongated') {
     category = 'Elongated (Подовжене)'
-    advice = 'Обличчя витягнуте: обирайте більші оправи, щоб візуально збалансувати пропорції.'
-    recommendedModels = ['Oversized', 'Wayfarer', 'Aviator']
   } else if (currentShapeKey === 'Angular') {
     category = 'Angular (Квадратне/Гостре)'
-    advice = 'Виражені кути: краще працюють круглі або овальні оправи, які пом’якшують контури.'
-    recommendedModels = ['Round', 'Oval', 'Panto']
   } else if (currentShapeKey === 'Rounded') {
     category = 'Rounded (Кругле)'
-    advice = 'Плавні лінії: прямокутні та більш графічні оправи додають структури.'
-    recommendedModels = ['Square', 'Rectangular', 'Cat-eye']
   }
 
   recommendationCard.hidden = false
   if (category !== currentCategoryStr) {
     currentCategoryStr = category
     faceShapeCategory.textContent = 'Analyzing...'
-    recBody.hidden = true
     if (shapeDetectTimeout) clearTimeout(shapeDetectTimeout)
     shapeDetectTimeout = setTimeout(() => {
       faceShapeCategory.textContent = category
-      faceShapeAdvice.textContent = advice
-      faceShapeModels.textContent = recommendedModels.join(', ')
-      recBody.hidden = false
     }, 600)
   }
 }
@@ -371,10 +349,18 @@ function loop() {
 }
 
 // Smoothing State
+let smoothedAnchor = new THREE.Vector3()
 let smoothedPos = new THREE.Vector3()
 let smoothedQuat = new THREE.Quaternion()
 let smoothedScale = new THREE.Vector3(1, 1, 1)
-const LERP_FACTOR = 0.2 // (0.8 old + 0.2 new)
+let hasSmoothedAnchor = false
+const POSITION_LERP = 0.18
+const ROTATION_LERP = 0.34
+const SCALE_LERP = 0.14
+const ANCHOR_LERP = 0.22
+const POSITION_DEADZONE = 0.012
+const SCALE_DEADZONE = 0.008
+const ROTATION_DEADZONE_DOT = 0.9996
 
 function update3D(landmarks, matrix) {
   faceGroup.visible = true
@@ -383,12 +369,19 @@ function update3D(landmarks, matrix) {
   const vH = 2 * Math.tan((45 * Math.PI / 180) / 2) * 5
   const vW = vH * aspect
 
-  const basePos = new THREE.Vector3(
+  const rawAnchorPos = new THREE.Vector3(
     (0.5 - anchor.x) * vW,
     (0.5 - anchor.y) * vH,
     0
   )
-  basePos.y += (manualY * 0.5) // Manual Height from slider
+  rawAnchorPos.y += (manualY * 0.5) // Manual Height from slider
+
+  if (!hasSmoothedAnchor) {
+    smoothedAnchor.copy(rawAnchorPos)
+    hasSmoothedAnchor = true
+  } else {
+    smoothedAnchor.lerp(rawAnchorPos, ANCHOR_LERP)
+  }
 
   const targetQuat = new THREE.Quaternion()
   if (matrix) {
@@ -400,18 +393,30 @@ function update3D(landmarks, matrix) {
     targetQuat.copy(quat)
   }
 
-  const targetPos = basePos
+  const targetPos = smoothedAnchor.clone()
 
   const p33 = landmarks[33]
   const p263 = landmarks[263]
-  const eyeDist = Math.sqrt(Math.pow(p33.x - p263.x, 2) + Math.pow(p33.y - p263.y, 2))
+  const eyeDist = Math.hypot(p33.x - p263.x, p33.y - p263.y)
   const s = eyeDist * 2.45 * manualScale
   const targetScale = new THREE.Vector3(s, s, s)
 
-  // Apply Exponential Smoothing (EMA)
-  smoothedPos.lerp(targetPos, LERP_FACTOR)
-  smoothedQuat.slerp(targetQuat, LERP_FACTOR)
-  smoothedScale.lerp(targetScale, LERP_FACTOR)
+  const positionDelta = smoothedPos.distanceTo(targetPos)
+  if (positionDelta > POSITION_DEADZONE) {
+    smoothedPos.lerp(targetPos, POSITION_LERP)
+  }
+
+  const rotationAlignment = Math.abs(smoothedQuat.dot(targetQuat))
+  if (rotationAlignment < ROTATION_DEADZONE_DOT) {
+    smoothedQuat.slerp(targetQuat, ROTATION_LERP)
+  } else {
+    smoothedQuat.copy(targetQuat)
+  }
+
+  const scaleDelta = smoothedScale.distanceTo(targetScale)
+  if (scaleDelta > SCALE_DEADZONE) {
+    smoothedScale.lerp(targetScale, SCALE_LERP)
+  }
 
   if (current3DModel) {
     // Apply depth in the model's local space so the face anchor stays stable
